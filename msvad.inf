@@ -1,0 +1,142 @@
+[Version]
+Signature="$CHICAGO$"
+Class=MEDIA
+Provider=%MSFT%
+ClassGUID={4d36e96c-e325-11ce-bfc1-08002be10318}
+DriverVer = 02/22/2007, 6.0.6000.1
+CatalogFile=msvad.cat
+
+[SourceDisksNames]
+222="MSVAD Driver Disk","",222
+
+[SourceDisksFiles]
+vadsimpl.sys=222
+
+;;This syntax is only recognized on Windows XP and above- it is needed to install 64-bit drivers on
+;;Windows Server 2003 Service Pack 1 and above.
+
+[Manufacturer]
+%MfgName%=MicrosoftDS,NTAMD64,NTIA64
+
+;;  For Windows Server 2003 Service Pack 1 and above, a 64-bit OS will not install a driver
+;;  unless the Manufacturer and Models Sections explicitly show it is a driver for that platform
+;;  But the individual model section decorations (or lack thereof) work as they always have.
+;;  All of the model sections referred to are undecorated or NT-decorated, hence work on all platforms
+
+[MicrosoftDS]
+%MSVAD_Simple.DeviceDesc%=MSVAD_Simple,*MSVADSimple
+
+;; This section enables installing on x64 systems
+
+[MicrosoftDS.NTAMD64]
+%MSVAD_Simple.DeviceDesc%=MSVAD_Simple,*MSVADSimple
+
+;;  This section enables installing on Itanium systems
+
+[MicrosoftDS.NTIA64]
+%MSVAD_Simple.DeviceDesc%=MSVAD_Simple,*MSVADSimple
+
+[DestinationDirs]
+MSVAD_Simple.CopyList=10,system32\drivers
+
+;======================================================
+; MSVAD_SIMPLE
+;======================================================
+[MSVAD_Simple]
+AlsoInstall=ks.registration(ks.inf),wdmaudio.registration(wdmaudio.inf)
+CopyFiles=MSVAD_Simple.CopyList
+AddReg=MSVAD_Simple.AddReg
+
+[MSVAD_Simple.CopyList]
+vadsimpl.sys
+
+[MSVAD_Simple.Interfaces]
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_Wave%,MSVAD.I.Wave
+AddInterface=%KSCATEGORY_RENDER%,%KSNAME_Wave%,MSVAD.I.Wave
+AddInterface=%KSCATEGORY_CAPTURE%,%KSNAME_Wave%,MSVAD.I.Wave
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_Topology%,MSVAD.I.Topo
+
+[MSVAD_Simple.AddReg]
+HKR,,AssociatedFilters,,"wdmaud,swmidi,redbook"
+HKR,,Driver,,vadsimpl.sys
+
+HKR,Drivers,SubClasses,,"wave,midi,mixer"
+
+HKR,Drivers\wave\wdmaud.drv,Driver,,wdmaud.drv
+HKR,Drivers\midi\wdmaud.drv,Driver,,wdmaud.drv
+HKR,Drivers\mixer\wdmaud.drv,Driver,,wdmaud.drv
+
+HKR,Drivers\wave\wdmaud.drv,Description,,%MSVAD_Simple.DeviceDesc%
+HKR,Drivers\midi\wdmaud.drv,Description,,%MSVAD_MIDI%
+HKR,Drivers\mixer\wdmaud.drv,Description,,%MSVAD_Simple.DeviceDesc%
+
+HKLM,%MediaCategories%\%Simple.NameGuid%,Name,,%Simple.Name%
+
+;======================================================
+; COMMON
+;======================================================
+[MSVAD.I.Wave]
+AddReg=MSVAD.I.Wave.AddReg
+[MSVAD.I.Wave.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%MSVAD.Wave.szPname%
+
+[MSVAD.I.Topo]
+AddReg=MSVAD.I.Topo.AddReg
+[MSVAD.I.Topo.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%MSVAD.Topo.szPname%
+
+;======================================================
+; MSVAD_SIMPLE
+;======================================================
+[MSVAD_Simple.NT]
+Include=ks.inf,wdmaudio.inf
+Needs=KS.Registration, WDMAUDIO.Registration
+CopyFiles=MSVAD_Simple.CopyList
+AddReg=MSVAD_Simple.AddReg
+
+[MSVAD_Simple.NT.Interfaces]
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_Wave%,MSVAD.I.Wave
+AddInterface=%KSCATEGORY_RENDER%,%KSNAME_Wave%,MSVAD.I.Wave
+AddInterface=%KSCATEGORY_CAPTURE%,%KSNAME_Wave%,MSVAD.I.Wave
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_Topology%,MSVAD.I.Topo
+
+[MSVAD_Simple.NT.Services]
+AddService=msvad_simple,0x00000002,msvad_Simple_Service_Inst
+
+[msvad_Simple_Service_Inst]
+DisplayName=%msvad_simple.SvcDesc%
+ServiceType=1
+StartType=3
+ErrorControl=1
+ServiceBinary=%10%\system32\drivers\vadSimpl.sys
+
+;======================================================
+; COMMON
+;======================================================
+[Strings]
+MSFT="Microsoft"
+MfgName="Microsoft Audio DDK"
+MSVAD_Simple.DeviceDesc="Microsoft Virtual Audio Device (Simple) (WDM)"
+
+MSVAD.Wave.szPname="MSVAD Wave"
+MSVAD.Topo.szPname="MSVAD Topology"
+MSVAD_MIDI="MSVAD -> WDM Midi Device"
+
+Proxy.CLSID="{17CCA71B-ECD7-11D0-B908-00A0C9223196}"
+KSCATEGORY_AUDIO="{6994AD04-93EF-11D0-A3CC-00A0C9223196}"
+KSCATEGORY_RENDER="{65E8773E-8F56-11D0-A3B9-00A0C9223196}"
+KSCATEGORY_CAPTURE="{65E8773D-8F56-11D0-A3B9-00A0C9223196}"
+
+KSNAME_Wave="Wave"
+KSNAME_Topology="Topology"
+
+msvad_simple.SvcDesc="Microsoft Virtual Audio Device (Simple) (WDM)"
+
+MediaCategories="SYSTEM\CurrentControlSet\Control\MediaCategories"
+
+Simple.NameGuid="{946A7B1A-EBBC-422a-A81F-F07C8D40D3B4}"
+Simple.Name="MSVAD (Simple)"
+
+
