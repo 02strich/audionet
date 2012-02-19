@@ -19,7 +19,7 @@ DEFINE_GUIDSTRUCT("946A7B1A-EBBC-422a-A81F-F07C8D40D3B4", NAME_MSVAD_SIMPLE);
 #define NAME_MSVAD_SIMPLE DEFINE_GUIDNAMED(NAME_MSVAD_SIMPLE)
 
 // Pin properties.
-#define MAX_OUTPUT_STREAMS          1       // Number of capture streams.
+#define MAX_OUTPUT_STREAMS          0       // Number of capture streams.
 #define MAX_INPUT_STREAMS           1       // Number of render streams.
 #define MAX_TOTAL_STREAMS           MAX_OUTPUT_STREAMS + MAX_INPUT_STREAMS                      
 

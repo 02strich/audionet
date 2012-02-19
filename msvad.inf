@@ -26,12 +26,8 @@ vadsimpl.sys=222
 [MicrosoftDS]
 %MSVAD_Simple.DeviceDesc%=MSVAD_Simple,*MSVADSimple
 
-;; This section enables installing on x64 systems
-
 [MicrosoftDS.NTAMD64]
 %MSVAD_Simple.DeviceDesc%=MSVAD_Simple,*MSVADSimple
-
-;;  This section enables installing on Itanium systems
 
 [MicrosoftDS.NTIA64]
 %MSVAD_Simple.DeviceDesc%=MSVAD_Simple,*MSVADSimple
@@ -53,21 +49,18 @@ vadsimpl.sys
 [MSVAD_Simple.Interfaces]
 AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_Wave%,MSVAD.I.Wave
 AddInterface=%KSCATEGORY_RENDER%,%KSNAME_Wave%,MSVAD.I.Wave
-AddInterface=%KSCATEGORY_CAPTURE%,%KSNAME_Wave%,MSVAD.I.Wave
 AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_Topology%,MSVAD.I.Topo
 
 [MSVAD_Simple.AddReg]
-HKR,,AssociatedFilters,,"wdmaud,swmidi,redbook"
+HKR,,AssociatedFilters,,"wdmaud,redbook"
 HKR,,Driver,,vadsimpl.sys
 
-HKR,Drivers,SubClasses,,"wave,midi,mixer"
+HKR,Drivers,SubClasses,,"wave,mixer"
 
 HKR,Drivers\wave\wdmaud.drv,Driver,,wdmaud.drv
-HKR,Drivers\midi\wdmaud.drv,Driver,,wdmaud.drv
 HKR,Drivers\mixer\wdmaud.drv,Driver,,wdmaud.drv
 
 HKR,Drivers\wave\wdmaud.drv,Description,,%MSVAD_Simple.DeviceDesc%
-HKR,Drivers\midi\wdmaud.drv,Description,,%MSVAD_MIDI%
 HKR,Drivers\mixer\wdmaud.drv,Description,,%MSVAD_Simple.DeviceDesc%
 
 HKLM,%MediaCategories%\%Simple.NameGuid%,Name,,%Simple.Name%
@@ -99,7 +92,6 @@ AddReg=MSVAD_Simple.AddReg
 [MSVAD_Simple.NT.Interfaces]
 AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_Wave%,MSVAD.I.Wave
 AddInterface=%KSCATEGORY_RENDER%,%KSNAME_Wave%,MSVAD.I.Wave
-AddInterface=%KSCATEGORY_CAPTURE%,%KSNAME_Wave%,MSVAD.I.Wave
 AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_Topology%,MSVAD.I.Topo
 
 [MSVAD_Simple.NT.Services]

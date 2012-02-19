@@ -159,16 +159,6 @@ static PCPIN_DESCRIPTOR MiniportPins[] = {
 };
 
 //=============================================================================
-static  KSJACK_DESCRIPTION JackDescMic = {
-    KSAUDIO_SPEAKER_STEREO,
-    0xE88C99,               // HDAudio color spec for pink
-    eConnType3Point5mm,
-    eGeoLocRear,
-    eGenLocPrimaryBox,
-    ePortConnJack,
-    TRUE
-};
-
 static KSJACK_DESCRIPTION JackDescSpeakers = {
     KSAUDIO_SPEAKER_STEREO,
     0xB3C98C,               // HDAudio color spec for green
@@ -183,7 +173,7 @@ static PKSJACK_DESCRIPTION JackDescriptions[] = {
     NULL,
     NULL,
     NULL,
-    &JackDescMic,
+    NULL,
     &JackDescSpeakers,
     NULL
 };
@@ -373,19 +363,19 @@ C_ASSERT( KSNODE_TOPO_DEV_SPECIFIC_UINT == DEV_SPECIFIC_VT_UI4 );
 //=============================================================================
 static PCCONNECTION_DESCRIPTOR MiniportConnections[] = {
   //  FromNode,                     FromPin,                        ToNode,                      ToPin
-  {   PCFILTER_NODE,                KSPIN_TOPO_WAVEOUT_SOURCE,      KSNODE_TOPO_WAVEOUT_VOLUME,  1 },
-  {   KSNODE_TOPO_WAVEOUT_VOLUME,   0,                              KSNODE_TOPO_WAVEOUT_MUTE,    1 },
-  {   KSNODE_TOPO_WAVEOUT_MUTE,     0,                              KSNODE_TOPO_LINEOUT_MIX,     1 },
+  {   PCFILTER_NODE,                KSPIN_TOPO_WAVEOUT_SOURCE,      KSNODE_TOPO_WAVEOUT_VOLUME,    1 },
+  {   KSNODE_TOPO_WAVEOUT_VOLUME,   0,                              KSNODE_TOPO_WAVEOUT_MUTE,      1 },
+  {   KSNODE_TOPO_WAVEOUT_MUTE,     0,                              KSNODE_TOPO_LINEOUT_MIX,       1 },
 
-  {   PCFILTER_NODE,                KSPIN_TOPO_SYNTHOUT_SOURCE,     KSNODE_TOPO_SYNTHOUT_VOLUME, 1 },
-  {   KSNODE_TOPO_SYNTHOUT_VOLUME,  0,                              KSNODE_TOPO_SYNTHOUT_MUTE,   1 },
-  {   KSNODE_TOPO_SYNTHOUT_MUTE,    0,                              KSNODE_TOPO_LINEOUT_MIX,     2 },
+  {   PCFILTER_NODE,                KSPIN_TOPO_SYNTHOUT_SOURCE,     KSNODE_TOPO_SYNTHOUT_VOLUME,   1 },
+  {   KSNODE_TOPO_SYNTHOUT_VOLUME,  0,                              KSNODE_TOPO_SYNTHOUT_MUTE,     1 },
+  {   KSNODE_TOPO_SYNTHOUT_MUTE,    0,                              KSNODE_TOPO_LINEOUT_MIX,       2 },
 
-  {   PCFILTER_NODE,                KSPIN_TOPO_SYNTHIN_SOURCE,      KSNODE_TOPO_SYNTHIN_VOLUME,  1 },
-  {   KSNODE_TOPO_SYNTHIN_VOLUME,   0,                              KSNODE_TOPO_WAVEIN_MUX,      2 },
+  {   PCFILTER_NODE,                KSPIN_TOPO_SYNTHIN_SOURCE,      KSNODE_TOPO_SYNTHIN_VOLUME,    1 },
+  {   KSNODE_TOPO_SYNTHIN_VOLUME,   0,                              KSNODE_TOPO_WAVEIN_MUX,        2 },
 
-  {   PCFILTER_NODE,                KSPIN_TOPO_MIC_SOURCE,          KSNODE_TOPO_MIC_VOLUME,      1 },
-  {   KSNODE_TOPO_MIC_VOLUME,       0,                              KSNODE_TOPO_WAVEIN_MUX,      1 },
+  {   PCFILTER_NODE,                KSPIN_TOPO_MIC_SOURCE,          KSNODE_TOPO_MIC_VOLUME,        1 },
+  {   KSNODE_TOPO_MIC_VOLUME,       0,                              KSNODE_TOPO_WAVEIN_MUX,        1 },
 
   {   KSNODE_TOPO_LINEOUT_MIX,      0,                              KSNODE_TOPO_DEV_SPECIFIC_BOOL, 1 },
   {   KSNODE_TOPO_DEV_SPECIFIC_BOOL,0,                              KSNODE_TOPO_DEV_SPECIFIC_INT,  1 },
@@ -393,7 +383,7 @@ static PCCONNECTION_DESCRIPTOR MiniportConnections[] = {
   {   KSNODE_TOPO_DEV_SPECIFIC_UINT,0,                              KSNODE_TOPO_LINEOUT_VOLUME,    1 },
   {   KSNODE_TOPO_LINEOUT_VOLUME,   0,                              PCFILTER_NODE,                 KSPIN_TOPO_LINEOUT_DEST },
 
-  {   KSNODE_TOPO_WAVEIN_MUX,       0,                              PCFILTER_NODE,               KSPIN_TOPO_WAVEIN_DEST }
+  {   KSNODE_TOPO_WAVEIN_MUX,       0,                              PCFILTER_NODE,                 KSPIN_TOPO_WAVEIN_DEST }
 };
 
 

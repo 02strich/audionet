@@ -586,9 +586,8 @@ Return Value:
     } else if (PropertyRequest->Verb & KSPROPERTY_TYPE_GET) {
         ntStatus = ValidatePropertyParams(PropertyRequest, sizeof(LONG), 0);
         if (NT_SUCCESS(ntStatus)) {
-            *(PLONG(PropertyRequest->Value)) = KSAUDIO_CPU_RESOURCES_NOT_HOST_CPU;
+            *(PLONG(PropertyRequest->Value)) = KSAUDIO_CPU_RESOURCES_HOST_CPU;
             PropertyRequest->ValueSize = sizeof(LONG);
-            ntStatus = STATUS_SUCCESS;
         }
     } 
 

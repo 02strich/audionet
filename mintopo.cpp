@@ -36,8 +36,8 @@ Abstract:
 PHYSICALCONNECTIONTABLE TopologyPhysicalConnections =
 {
     KSPIN_TOPO_WAVEOUT_SOURCE,  // TopologyIn
-    KSPIN_TOPO_WAVEIN_DEST,     // TopologyOut
-    KSPIN_WAVE_CAPTURE_SOURCE,  // WaveIn
+	(ULONG)-1,
+	(ULONG)-1,
     KSPIN_WAVE_RENDER_SOURCE    // WaveOut
 };
 
@@ -357,14 +357,14 @@ Return Value:
 
     NTSTATUS ntStatus = STATUS_INVALID_DEVICE_REQUEST;
 
-    if (PropertyRequest->Verb & KSPROPERTY_TYPE_GET) {
+	if (PropertyRequest->Verb & KSPROPERTY_TYPE_BASICSUPPORT) {
+        ntStatus = PropertyHandler_BasicSupport(PropertyRequest, KSPROPERTY_TYPE_GET | KSPROPERTY_TYPE_BASICSUPPORT, VT_ILLEGAL);
+    } else if (PropertyRequest->Verb & KSPROPERTY_TYPE_GET) {
         ntStatus = ValidatePropertyParams(PropertyRequest, sizeof(ULONG));
         if (NT_SUCCESS(ntStatus)) {
-            *(PLONG(PropertyRequest->Value)) = KSAUDIO_CPU_RESOURCES_NOT_HOST_CPU;
+            *(PLONG(PropertyRequest->Value)) = KSAUDIO_CPU_RESOURCES_HOST_CPU;
             PropertyRequest->ValueSize = sizeof(LONG);
         }
-    } else if (PropertyRequest->Verb & KSPROPERTY_TYPE_BASICSUPPORT) {
-        ntStatus = PropertyHandler_BasicSupport(PropertyRequest, KSPROPERTY_TYPE_GET | KSPROPERTY_TYPE_BASICSUPPORT, VT_ILLEGAL);
     }
 
     return ntStatus;
