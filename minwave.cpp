@@ -702,7 +702,7 @@ Return Value:
 {
     PAGED_CODE();
 
-    DPF_ENTER(("CMiniportWaveCyclic::ValidatePcm"));
+    DPF_ENTER(("[CMiniportWaveCyclic::ValidatePcm]"));
 
     if(pWfx                                               &&
       (pWfx->cbSize == 0)                                 &&
