@@ -11,6 +11,20 @@ Abstract:
 #ifndef _MSVAD_SAVEDATA_H
 #define _MSVAD_SAVEDATA_H
 
+#pragma warning(push)
+#pragma warning(disable:4201) // nameless struct/union
+#pragma warning(disable:4214) // bit field types other than int
+
+// fix strange warnings from wsk.h
+#pragma warning(disable:4510)
+#pragma warning(disable:4512)
+#pragma warning(disable:4610)
+
+#include <ntddk.h>
+#include <wsk.h>
+
+#pragma warning(pop)
+
 //-----------------------------------------------------------------------------
 //  Forward declaration
 //-----------------------------------------------------------------------------
@@ -65,28 +79,22 @@ IO_WORKITEM_ROUTINE SaveFrameWorkerCallback;
 
 class CSaveData {
 protected:
-    UNICODE_STRING              m_FileName;         // DataFile name.
-    HANDLE                      m_FileHandle;       // DataFile handle.
-    PBYTE                       m_pDataBuffer;      // Data buffer.
-    ULONG                       m_ulBufferSize;     // Total buffer size.
-
-    ULONG                       m_ulFramePtr;       // Current Frame.
-    ULONG                       m_ulFrameCount;     // Frame count.
-    ULONG                       m_ulFrameSize;
-    ULONG                       m_ulBufferPtr;      // Pointer in buffer.
-    PBOOL                       m_fFrameUsed;       // Frame usage table.
-    KSPIN_LOCK                  m_FrameInUseSpinLock; // Spinlock for synch.
-
-    OBJECT_ATTRIBUTES           m_objectAttributes; // Used for opening file.
-
-    OUTPUT_FILE_HEADER          m_FileHeader;
-    PWAVEFORMATEX               m_waveFormat;
-    OUTPUT_DATA_HEADER          m_DataHeader;
-    PLARGE_INTEGER              m_pFilePtr;
-
+	WSK_REGISTRATION			m_wskSampleRegistration;
+	PWSK_SOCKET					m_socket;
+	PIRP						m_irp;
+	
+	KEVENT						m_syncEvent;
+	
+	// Data buffer and MDL used by send operations
+    PVOID						m_dataBuffer;
+    PMDL						m_dataMdl;
+    ULONG						m_bufferLength;
+	ULONG						m_dataLength;
+	
+	PWAVEFORMATEX               m_waveFormat;
+	
     static PDEVICE_OBJECT       m_pDeviceObject;
     static ULONG                m_ulStreamId;
-    static PSAVEWORKER_PARAM    m_pWorkItems;
 
     BOOL                        m_fWriteDisabled;
 
@@ -99,27 +107,11 @@ public:
 	NTSTATUS                    Initialize(void);
 	NTSTATUS                    SetDataFormat(IN  PKSDATAFORMAT pDataFormat);
 	void                        Disable(BOOL fDisable);
-	
-    static void                 DestroyWorkItems(void);
-    static PSAVEWORKER_PARAM    GetNewWorkItem(void);
-    void                        WaitAllWorkItems(void);
-	
+		
 	static NTSTATUS             SetDeviceObject(IN PDEVICE_OBJECT DeviceObject);
 	static PDEVICE_OBJECT       GetDeviceObject(void);
     
-	void                        ReadData(IN PBYTE pBuffer, IN ULONG ulByteCount);
     void                        WriteData(IN PBYTE pBuffer, IN ULONG ulByteCount);
-
-private:
-    static NTSTATUS             InitializeWorkItems(IN PDEVICE_OBJECT DeviceObject);
-
-    NTSTATUS                    FileClose(void);
-    NTSTATUS                    FileOpen(IN BOOL fOverWrite);
-    NTSTATUS                    FileWrite(IN PBYTE pData, IN ULONG ulDataSize);
-    NTSTATUS                    FileWriteHeader(void);
-
-    void                        SaveFrame(IN ULONG ulFrameNo, IN ULONG ulDataSize);
-    friend VOID                 SaveFrameWorkerCallback(PDEVICE_OBJECT pDeviceObject, IN PVOID Context);
 };
 typedef CSaveData *PCSaveData;
 

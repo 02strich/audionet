@@ -2,14 +2,15 @@ TARGETTYPE=DRIVER
 TARGETNAME=vadsimpl
 
 TARGETLIBS= \
-        $(DDK_LIB_PATH)\portcls.lib\
+        $(DDK_LIB_PATH)\portcls.lib \
+        $(DDK_LIB_PATH)\netio.lib \
         $(DDK_LIB_PATH)\stdunk.lib
 
 INCLUDES= \
         $(DDK_INC_PATH); \
         ..
 
-MSC_WARNING_LEVEL=-W4 -WX
+MSC_WARNING_LEVEL=/W4 /WX
 
 C_DEFINES= $(C_DEFINES) -D_WIN32 -DUNICODE -D_UNICODE -DPC_IMPLEMENTATION
 

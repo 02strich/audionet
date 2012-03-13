@@ -138,12 +138,10 @@ Return Value:
 
         // If this is not the capture stream, create the output file.
         if (!m_fCapture) {
-            DPF(D_TERSE, ("SaveData %p", &m_SaveData));
             ntStatus = m_SaveData.SetDataFormat(DataFormat_);
             if (NT_SUCCESS(ntStatus)) {
                 ntStatus = m_SaveData.Initialize();
             }
-
         }
     }
 
@@ -352,7 +350,7 @@ Return Value:
                 m_pMiniport->m_SamplingFrequency = pWfx->nSamplesPerSec;
                 m_ulDmaMovementRate = pWfx->nAvgBytesPerSec;
 
-                DPF(D_TERSE, ("New Format: %d", pWfx->nSamplesPerSec));
+                DPF(D_TERSE, ("New Format - SpS: %d - BpS: %d - aBypS: %d - C: %d", pWfx->nSamplesPerSec, pWfx->wBitsPerSample, pWfx->nAvgBytesPerSec, pWfx->nChannels));
             }
 
             KeReleaseMutex(&m_pMiniport->m_SampleRateSync, FALSE);
@@ -458,9 +456,9 @@ Return Value:
                 KeCancelTimer(m_pTimer);
     
                 // Wait until all work items are completed.
-                if (!m_fCapture) {
+                /*if (!m_fCapture) {
                     m_SaveData.WaitAllWorkItems();
-                }
+                }*/
                 break;
         }
 

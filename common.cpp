@@ -18,7 +18,7 @@ Abstract:
 //-----------------------------------------------------------------------------
 // Externals
 //-----------------------------------------------------------------------------
-PSAVEWORKER_PARAM CSaveData::m_pWorkItems = NULL;
+//PSAVEWORKER_PARAM CSaveData::m_pWorkItems = NULL;
 PDEVICE_OBJECT    CSaveData::m_pDeviceObject = NULL;
 
 //=============================================================================
@@ -128,7 +128,7 @@ Return Value:
         delete m_pHW;
     }
 
-    CSaveData::DestroyWorkItems();
+    //CSaveData::DestroyWorkItems();
 
     if (m_pPortWave) {
         m_pPortWave->Release();
