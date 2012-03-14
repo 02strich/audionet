@@ -2,7 +2,8 @@ TARGETTYPE=DRIVER
 TARGETNAME=vadsimpl
 
 TARGETLIBS= \
-        $(DDK_LIB_PATH)\portcls.lib\
+        $(DDK_LIB_PATH)\portcls.lib \
+        $(DDK_LIB_PATH)\netio.lib \
         $(DDK_LIB_PATH)\stdunk.lib
 
 INCLUDES= \

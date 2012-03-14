@@ -20,28 +20,42 @@ Abstract:
 
 #include <msvad.h>
 #include "savedata.h"
-#include <ntstrsafe.h>   // This is for using RtlStringcbPrintf
 
 //=============================================================================
 // Defines
 //=============================================================================
-#define RIFF_TAG                    0x46464952;
-#define WAVE_TAG                    0x45564157;
-#define FMT__TAG                    0x20746D66;
-#define DATA_TAG                    0x61746164;
-
-#define DEFAULT_FRAME_COUNT         2
-#define DEFAULT_FRAME_SIZE          PAGE_SIZE * 4
+#define DEFAULT_FRAME_COUNT         5
+#define DEFAULT_FRAME_SIZE          PAGE_SIZE
 #define DEFAULT_BUFFER_SIZE         DEFAULT_FRAME_SIZE * DEFAULT_FRAME_COUNT
 
-#define DEFAULT_FILE_NAME           L"\\DosDevices\\C:\\STREAM"
-
-#define MAX_WORKER_ITEM_COUNT       15
+#define MAX_WORKER_ITEM_COUNT       1
 
 //=============================================================================
 // Statics
 //=============================================================================
 ULONG CSaveData::m_ulStreamId = 0;
+
+// Client-level callback table
+const WSK_CLIENT_DISPATCH WskSampleClientDispatch = {
+    MAKE_WSK_VERSION(1, 0), // This sample uses WSK version 1.0
+    0, // Reserved
+    NULL // WskClientEvent callback is not required in WSK version 1.0
+};
+
+//=============================================================================
+// Helper Functions
+//=============================================================================
+// IRP completion routine used for synchronously waiting for completion
+NTSTATUS WskSampleSyncIrpCompletionRoutine(__in PDEVICE_OBJECT Reserved, __in PIRP Irp, __in PVOID Context) {    
+    PKEVENT compEvent = (PKEVENT)Context;
+    
+    UNREFERENCED_PARAMETER(Reserved);
+    UNREFERENCED_PARAMETER(Irp);
+    
+    KeSetEvent(compEvent, 2, FALSE);    
+
+    return STATUS_MORE_PROCESSING_REQUIRED;
+}
 
 #pragma code_seg("PAGE")
 //=============================================================================
@@ -49,22 +63,30 @@ ULONG CSaveData::m_ulStreamId = 0;
 //=============================================================================
 
 //=============================================================================
-CSaveData::CSaveData() : m_pDataBuffer(NULL), m_FileHandle(NULL), m_ulFrameCount(DEFAULT_FRAME_COUNT), m_ulBufferSize(DEFAULT_BUFFER_SIZE), m_ulFrameSize(DEFAULT_FRAME_SIZE), m_ulBufferPtr(0), m_ulFramePtr(0), m_fFrameUsed(NULL), m_pFilePtr(NULL), m_fWriteDisabled(FALSE), m_bInitialized(FALSE) {
+CSaveData::CSaveData() : m_pDataBuffer(NULL), m_ulFrameCount(DEFAULT_FRAME_COUNT), m_ulBufferSize(DEFAULT_BUFFER_SIZE), m_ulFrameSize(DEFAULT_FRAME_SIZE), m_ulBufferPtr(0), m_ulFramePtr(0), m_fFrameUsed(NULL), m_fWriteDisabled(FALSE), m_bInitialized(FALSE) {
     PAGED_CODE();
 
-    m_FileHeader.dwRiff           = RIFF_TAG;
-    m_FileHeader.dwFileSize       = 0;
-    m_FileHeader.dwWave           = WAVE_TAG;
-    m_FileHeader.dwFormat         = FMT__TAG;
-    m_FileHeader.dwFormatLength   = sizeof(WAVEFORMATEX);
-
-    m_DataHeader.dwData           = DATA_TAG;
-    m_DataHeader.dwDataLength     = 0;
-
-    RtlZeroMemory(&m_objectAttributes, sizeof(m_objectAttributes));
-
+    DPF_ENTER(("[CSaveData::CSaveData]"));
+    
+    WSK_CLIENT_NPI   wskClientNpi;
+    
+    // new stream
     m_ulStreamId++;
+    
+    // allocate work items for this stream
     InitializeWorkItems(GetDeviceObject());
+    
+    // get us an IRP
+    m_irp = IoAllocateIrp(1, FALSE);
+
+    // initialize io completion sychronization event
+    KeInitializeEvent(&m_syncEvent, SynchronizationEvent, FALSE);
+    
+    // Register with WSK.
+    wskClientNpi.ClientContext = NULL;
+    wskClientNpi.Dispatch = &WskSampleClientDispatch;
+    WskRegister(&wskClientNpi, &m_wskSampleRegistration);
+    
 } // CSaveData
 
 //=============================================================================
@@ -73,48 +95,51 @@ CSaveData::~CSaveData() {
 
     DPF_ENTER(("[CSaveData::~CSaveData]"));
 
-    // Update the wave header in data file with real file size.
-    //
-    if(m_pFilePtr) {
-        m_FileHeader.dwFileSize = (DWORD) m_pFilePtr->QuadPart - 2 * sizeof(DWORD);
-        m_DataHeader.dwDataLength = (DWORD) m_pFilePtr->QuadPart - sizeof(m_FileHeader) - m_FileHeader.dwFormatLength - sizeof(m_DataHeader);
-
-        if (NT_SUCCESS(FileOpen(FALSE))) {
-            FileWriteHeader();
-            FileClose();
+    // frees the work items
+    for (int i = 0; i < MAX_WORKER_ITEM_COUNT; i++) {
+        if (m_pWorkItems[i].WorkItem!=NULL) {
+            IoFreeWorkItem(m_pWorkItems[i].WorkItem);
+            m_pWorkItems[i].WorkItem = NULL;
         }
     }
 
-    // frees the work items
-   for (int i = 0; i < MAX_WORKER_ITEM_COUNT; i++) {
-       if (m_pWorkItems[i].WorkItem!=NULL) {
-           IoFreeWorkItem(m_pWorkItems[i].WorkItem);
-           m_pWorkItems[i].WorkItem = NULL;
-       }
-   }
+    // close socket
+    if(m_socket) {
+        IoReuseIrp(m_irp, STATUS_UNSUCCESSFUL);
+        IoSetCompletionRoutine(m_irp, WskSampleSyncIrpCompletionRoutine, &m_syncEvent, TRUE, TRUE, TRUE);
+        ((PWSK_PROVIDER_BASIC_DISPATCH)m_socket->Dispatch)->WskCloseSocket(m_socket, m_irp);
+        KeWaitForSingleObject(&m_syncEvent, Executive, KernelMode, FALSE, NULL);
+    }
+    
+    // Deregister with WSK. This call will wait until all the references to
+    // the WSK provider NPI are released and all the sockets are closed. Note
+    // that if the worker thread has not started yet, then when it eventually
+    // starts, its WskCaptureProviderNPI call will fail and the work queue
+    // will be flushed and cleaned up properly.
+    WskDeregister(&m_wskSampleRegistration);
 
+    // free irp
+    IoFreeIrp(m_irp);
+    
     if (m_waveFormat) {
         ExFreePoolWithTag(m_waveFormat, MSVAD_POOLTAG);
     }
 
     if (m_fFrameUsed) {
         ExFreePoolWithTag(m_fFrameUsed, MSVAD_POOLTAG);
-        // NOTE : Do not release m_pFilePtr.
-    }
-
-    if (m_FileName.Buffer) {
-        ExFreePoolWithTag(m_FileName.Buffer, MSVAD_POOLTAG);
     }
 
     if (m_pDataBuffer) {
         ExFreePoolWithTag(m_pDataBuffer, MSVAD_POOLTAG);
+        IoFreeMdl(m_pDataMdl);
     }
 } // CSaveData
 
 //=============================================================================
-void CSaveData::DestroyWorkItems(void)
-{
+void CSaveData::DestroyWorkItems(void) {
     PAGED_CODE();
+    
+    DPF_ENTER(("[CSaveData::DestroyWorkItems]"));
 
     if (m_pWorkItems) {
         ExFreePoolWithTag(m_pWorkItems, MSVAD_POOLTAG);
@@ -124,137 +149,14 @@ void CSaveData::DestroyWorkItems(void)
 } // DestroyWorkItems
 
 //=============================================================================
-void CSaveData::Disable(BOOL fDisable)
-{
+void CSaveData::Disable(BOOL fDisable) {
     PAGED_CODE();
 
     m_fWriteDisabled = fDisable;
 } // Disable
 
 //=============================================================================
-NTSTATUS CSaveData::FileClose(void) {
-    PAGED_CODE();
-
-    NTSTATUS                    ntStatus = STATUS_SUCCESS;
-
-    if (m_FileHandle) {
-        ntStatus = ZwClose(m_FileHandle);
-        m_FileHandle = NULL;
-    }
-
-    return ntStatus;
-} // FileClose
-
-//=============================================================================
-NTSTATUS CSaveData::FileOpen(IN BOOL fOverWrite) {
-    PAGED_CODE();
-
-    NTSTATUS        ntStatus = STATUS_SUCCESS;
-    IO_STATUS_BLOCK ioStatusBlock;
-
-    if(FALSE == m_bInitialized) {
-        return STATUS_UNSUCCESSFUL;
-    }
-
-    if(!m_FileHandle) {
-        ntStatus = ZwCreateFile(
-                &m_FileHandle,
-                GENERIC_WRITE | SYNCHRONIZE,
-                &m_objectAttributes,
-                &ioStatusBlock,
-                NULL,
-                FILE_ATTRIBUTE_NORMAL,
-                0,
-                fOverWrite ? FILE_OVERWRITE_IF : FILE_OPEN_IF,
-                FILE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT,
-                NULL,
-                0);
-        if (!NT_SUCCESS(ntStatus)) {
-            DPF(D_TERSE, ("[CSaveData::FileOpen : Error opening data file]"));
-        }
-    }
-
-    return ntStatus;
-} // FileOpen
-
-//=============================================================================
-NTSTATUS CSaveData::FileWrite(
-    IN  PBYTE                   pData,
-    IN  ULONG                   ulDataSize
-)
-{
-    PAGED_CODE();
-
-    ASSERT(pData);
-    ASSERT(m_pFilePtr);
-
-    NTSTATUS ntStatus;
-
-    if (m_FileHandle) {
-        IO_STATUS_BLOCK ioStatusBlock;
-
-        ntStatus = ZwWriteFile(m_FileHandle, NULL, NULL, NULL, &ioStatusBlock, pData, ulDataSize, m_pFilePtr, NULL);
-
-        if (NT_SUCCESS(ntStatus)) {
-            ASSERT(ioStatusBlock.Information == ulDataSize);
-            m_pFilePtr->QuadPart += ulDataSize;
-        } else {
-            DPF(D_TERSE, ("[CSaveData::FileWrite : WriteFileError]"));
-        }
-    } else {
-        DPF(D_TERSE, ("[CSaveData::FileWrite : File not open]"));
-        ntStatus = STATUS_INVALID_HANDLE;
-    }
-
-    return ntStatus;
-} // FileWrite
-
-//=============================================================================
-NTSTATUS CSaveData::FileWriteHeader(void) {
-    PAGED_CODE();
-
-    NTSTATUS                    ntStatus;
-
-    if (m_FileHandle && m_waveFormat) {
-        IO_STATUS_BLOCK         ioStatusBlock;
-        
-        m_pFilePtr->QuadPart = 0;
-        
-        m_FileHeader.dwFormatLength = (m_waveFormat->wFormatTag == WAVE_FORMAT_PCM) ? sizeof( PCMWAVEFORMAT ) : sizeof( WAVEFORMATEX ) + m_waveFormat->cbSize;
-
-        ntStatus = ZwWriteFile(m_FileHandle, NULL, NULL, NULL, &ioStatusBlock, &m_FileHeader, sizeof(m_FileHeader), m_pFilePtr, NULL);
-        if (!NT_SUCCESS(ntStatus)) {
-            DPF(D_TERSE, ("[CSaveData::FileWriteHeader : Write File Header Error]"));
-        }
-
-        m_pFilePtr->QuadPart += sizeof(m_FileHeader);
-
-        ntStatus = ZwWriteFile(m_FileHandle, NULL, NULL, NULL, &ioStatusBlock, m_waveFormat, m_FileHeader.dwFormatLength, m_pFilePtr, NULL);
-        if (!NT_SUCCESS(ntStatus)) {
-            DPF(D_TERSE, ("[CSaveData::FileWriteHeader : Write Format Error]"));
-        }
-
-        m_pFilePtr->QuadPart += m_FileHeader.dwFormatLength;
-        
-        ntStatus = ZwWriteFile(m_FileHandle, NULL, NULL, NULL, &ioStatusBlock, &m_DataHeader, sizeof(m_DataHeader), m_pFilePtr, NULL);
-        if (!NT_SUCCESS(ntStatus)) {
-            DPF(D_TERSE, ("[CSaveData::FileWriteHeader : Write Data Header Error]"));
-        }
-
-        m_pFilePtr->QuadPart += sizeof(m_DataHeader);
-    } else {
-        DPF(D_TERSE, ("[CSaveData::FileWriteHeader : File not open]"));
-        ntStatus = STATUS_INVALID_HANDLE;
-    }
-
-    return ntStatus;
-} // FileWriteHeader
-
-//=============================================================================
-NTSTATUS CSaveData::SetDeviceObject(
-    IN  PDEVICE_OBJECT          DeviceObject
-)
-{
+NTSTATUS CSaveData::SetDeviceObject(IN PDEVICE_OBJECT DeviceObject) {
     PAGED_CODE();
 
     ASSERT(DeviceObject);
@@ -266,21 +168,20 @@ NTSTATUS CSaveData::SetDeviceObject(
 }
 
 //=============================================================================
-PDEVICE_OBJECT CSaveData::GetDeviceObject(void)
-{
+PDEVICE_OBJECT CSaveData::GetDeviceObject(void) {
     PAGED_CODE();
 
     return m_pDeviceObject;
 }
 
 #pragma code_seg()
-
 //=============================================================================
-PSAVEWORKER_PARAM CSaveData::GetNewWorkItem(void)
-{
+PSAVEWORKER_PARAM CSaveData::GetNewWorkItem(void) {
     LARGE_INTEGER timeOut = { 0 };
     NTSTATUS      ntStatus;
 
+    DPF_ENTER(("[CSaveData::GetNewWorkItem]"));
+    
     for (int i = 0; i < MAX_WORKER_ITEM_COUNT; i++) {
         ntStatus = KeWaitForSingleObject(&m_pWorkItems[i].EventDone, Executive, KernelMode, FALSE, &timeOut);
         if (STATUS_SUCCESS == ntStatus) {
@@ -293,38 +194,18 @@ PSAVEWORKER_PARAM CSaveData::GetNewWorkItem(void)
 
     return NULL;
 } // GetNewWorkItem
-#pragma code_seg("PAGE")
 
+#pragma code_seg("PAGE")
 //=============================================================================
-NTSTATUS CSaveData::Initialize(void)
-{
+NTSTATUS CSaveData::Initialize(void) {
     PAGED_CODE();
 
-    NTSTATUS    ntStatus = STATUS_SUCCESS;
-    WCHAR       szTemp[MAX_PATH];
-    size_t      cLen;
+    NTSTATUS          ntStatus = STATUS_SUCCESS;
 
     DPF_ENTER(("[CSaveData::Initialize]"));
 
-    // Allocate data file name.
-    RtlStringCchPrintfW(szTemp, MAX_PATH, L"%s_%d.wav", DEFAULT_FILE_NAME, m_ulStreamId);
-    m_FileName.Length = 0;
-    ntStatus = RtlStringCchLengthW (szTemp, sizeof(szTemp)/sizeof(szTemp[0]), &cLen);
-    if (NT_SUCCESS(ntStatus)) {
-        m_FileName.MaximumLength = (USHORT)((cLen * sizeof(WCHAR)) +  sizeof(WCHAR));//convert to wchar and add room for NULL
-        m_FileName.Buffer = (PWSTR) ExAllocatePoolWithTag(PagedPool, m_FileName.MaximumLength, MSVAD_POOLTAG);
-        if (!m_FileName.Buffer){
-            DPF(D_TERSE, ("[Could not allocate memory for FileName]"));
-            ntStatus = STATUS_INSUFFICIENT_RESOURCES;
-        }
-    }
-
     // Allocate memory for data buffer.
     if (NT_SUCCESS(ntStatus)) {
-        RtlStringCbCopyW(m_FileName.Buffer, m_FileName.MaximumLength, szTemp);
-        m_FileName.Length = (USHORT)wcslen(m_FileName.Buffer) * sizeof(WCHAR);
-        DPF(D_BLAB, ("[New DataFile -- %S", m_FileName.Buffer));
-
         m_pDataBuffer = (PBYTE) ExAllocatePoolWithTag(NonPagedPool, m_ulBufferSize, MSVAD_POOLTAG);
         if (!m_pDataBuffer) {
             DPF(D_TERSE, ("[Could not allocate memory for Saving Data]"));
@@ -332,49 +213,43 @@ NTSTATUS CSaveData::Initialize(void)
         }
     }
 
-    // Allocate memory for frame usage flags and m_pFilePtr.
+    // Allocate MDL for the data buffer
     if (NT_SUCCESS(ntStatus)) {
-        m_fFrameUsed = (PBOOL) ExAllocatePoolWithTag(NonPagedPool, m_ulFrameCount * sizeof(BOOL) + sizeof(LARGE_INTEGER), MSVAD_POOLTAG);
+        m_pDataMdl = IoAllocateMdl(m_pDataBuffer, m_ulBufferSize, FALSE, FALSE, NULL);
+        if(m_pDataMdl == NULL) {
+            DPF(D_TERSE, ("[Failed to allocate MDL]"));
+            ntStatus = STATUS_INSUFFICIENT_RESOURCES;
+        } else {
+            MmBuildMdlForNonPagedPool(m_pDataMdl);
+        }
+    }    
+    
+    // Allocate memory for frame usage flags
+    if (NT_SUCCESS(ntStatus)) {
+        m_fFrameUsed = (PBOOL) ExAllocatePoolWithTag(NonPagedPool, m_ulFrameCount * sizeof(BOOL), MSVAD_POOLTAG);
         if (!m_fFrameUsed) {
             DPF(D_TERSE, ("[Could not allocate memory for frame flags]"));
             ntStatus = STATUS_INSUFFICIENT_RESOURCES;
         }
     }
 
-    // Initialize the spinlock to synchronize access to the frames
-    KeInitializeSpinLock ( &m_FrameInUseSpinLock ) ;
-
-    // Open the data file.
+    // Zero the page usage flags
     if (NT_SUCCESS(ntStatus)) {
-        // m_fFrameUsed has additional memory to hold m_pFilePtr
-        m_pFilePtr = (PLARGE_INTEGER) (((PBYTE) m_fFrameUsed) + m_ulFrameCount * sizeof(BOOL));
-        RtlZeroMemory(m_fFrameUsed, m_ulFrameCount * sizeof(BOOL) + sizeof(LARGE_INTEGER));
-
-        // Create data file.
-        InitializeObjectAttributes(&m_objectAttributes, &m_FileName, OBJ_CASE_INSENSITIVE|OBJ_KERNEL_HANDLE, NULL, NULL);
-
-        m_bInitialized = TRUE;
-
-        // Write wave header information to data file.
-        ntStatus = FileOpen(TRUE);
-        if (NT_SUCCESS(ntStatus)) {
-            ntStatus = FileWriteHeader();
-            FileClose();
-        }
+        RtlZeroMemory(m_fFrameUsed, m_ulFrameCount * sizeof(BOOL));
     }
+    
+    // Initialize the spinlock to synchronize access to the frames
+    KeInitializeSpinLock(&m_FrameInUseSpinLock);
 
     return ntStatus;
 } // Initialize
 
 //=============================================================================
-NTSTATUS CSaveData::InitializeWorkItems(
-    IN  PDEVICE_OBJECT          DeviceObject
-)
-{
+NTSTATUS CSaveData::InitializeWorkItems(IN PDEVICE_OBJECT DeviceObject) {
     PAGED_CODE();
 
     ASSERT(DeviceObject);
-
+    
     NTSTATUS ntStatus = STATUS_SUCCESS;
 
     DPF_ENTER(("[CSaveData::InitializeWorkItems]"));
@@ -399,10 +274,7 @@ NTSTATUS CSaveData::InitializeWorkItems(
 //=============================================================================
 IO_WORKITEM_ROUTINE SaveFrameWorkerCallback;
 
-VOID SaveFrameWorkerCallback(
-    PDEVICE_OBJECT pDeviceObject, IN  PVOID  Context
-)
-{
+VOID SaveFrameWorkerCallback(PDEVICE_OBJECT pDeviceObject, IN  PVOID  Context) {
     UNREFERENCED_PARAMETER(pDeviceObject);
 
     PAGED_CODE();
@@ -412,29 +284,139 @@ VOID SaveFrameWorkerCallback(
     PSAVEWORKER_PARAM pParam = (PSAVEWORKER_PARAM) Context;
     PCSaveData        pSaveData;
 
-    DPF(D_VERBOSE, ("[SaveFrameWorkerCallback], %d", pParam->ulFrameNo));
+    DPF_ENTER(("[SaveFrameWorkerCallback ulFrameNo=%d ulDataSize=%d]", pParam->ulFrameNo, pParam->ulDataSize));
 
     ASSERT(pParam->pSaveData);
     ASSERT(pParam->pSaveData->m_fFrameUsed);
 
     if (pParam->WorkItem) {
         pSaveData = pParam->pSaveData;
-
-        if (NT_SUCCESS(pSaveData->FileOpen(FALSE))) { 
-            pSaveData->FileWrite(pParam->pData, pParam->ulDataSize);
-            pSaveData->FileClose();
-        }
+        pSaveData->SendData(pParam->ulOffset, pParam->ulDataSize);
+        
         InterlockedExchange((LONG *)&(pSaveData->m_fFrameUsed[pParam->ulFrameNo]), FALSE);
     }
 
     KeSetEvent(&pParam->EventDone, 0, FALSE);
 } // SaveFrameWorkerCallback
 
+#pragma code_seg()
 //=============================================================================
-NTSTATUS CSaveData::SetDataFormat(
-    IN PKSDATAFORMAT            pDataFormat
-)
-{
+void CSaveData::CreateSocket(PSOCKADDR localAddress) {
+    NTSTATUS            status;
+    WSK_PROVIDER_NPI    pronpi;
+
+    // capture WSK provider
+    status = WskCaptureProviderNPI(&m_wskSampleRegistration, WSK_INFINITE_WAIT, &pronpi);
+    if(!NT_SUCCESS(status)){
+        DPF(D_TERSE, ("Failed to capture provider NPI: 0x%X\n", status));
+        return;
+    }
+    
+    // create socket
+    IoReuseIrp(m_irp, STATUS_UNSUCCESSFUL);
+    IoSetCompletionRoutine(m_irp, WskSampleSyncIrpCompletionRoutine, &m_syncEvent, TRUE, TRUE, TRUE);    
+    pronpi.Dispatch->WskSocket(
+        pronpi.Client,
+        AF_INET,
+        SOCK_DGRAM,
+        IPPROTO_UDP,
+        WSK_FLAG_DATAGRAM_SOCKET,
+        NULL, // socket context
+        NULL, // dispatch
+        NULL, // Process
+        NULL, // Thread
+        NULL, // SecurityDescriptor
+        m_irp);
+    KeWaitForSingleObject(&m_syncEvent, Executive, KernelMode, FALSE, NULL);
+    
+    DPF(D_TERSE, ("WskSocket: %x", m_irp->IoStatus.Status));
+    
+    if (!NT_SUCCESS(m_irp->IoStatus.Status)) {
+        DPF(D_TERSE, ("Failed to create socket: %x", m_irp->IoStatus.Status));
+        
+        if(m_socket) {
+            IoReuseIrp(m_irp, STATUS_UNSUCCESSFUL);
+            IoSetCompletionRoutine(m_irp, WskSampleSyncIrpCompletionRoutine, &m_syncEvent, TRUE, TRUE, TRUE);
+            ((PWSK_PROVIDER_BASIC_DISPATCH)m_socket->Dispatch)->WskCloseSocket(m_socket, m_irp);
+            KeWaitForSingleObject(&m_syncEvent, Executive, KernelMode, FALSE, NULL);
+        }
+        return;
+    }
+    
+    // save the socket
+    m_socket = (PWSK_SOCKET)m_irp->IoStatus.Information;
+    
+    // release the provider again, as we are finished with it
+    WskReleaseProviderNPI(&m_wskSampleRegistration);
+
+    // bind the socket
+    IoReuseIrp(m_irp, STATUS_UNSUCCESSFUL);
+    IoSetCompletionRoutine(m_irp, WskSampleSyncIrpCompletionRoutine, &m_syncEvent, TRUE, TRUE, TRUE);    
+    status = ((PWSK_PROVIDER_CONNECTION_DISPATCH)(m_socket->Dispatch))->WskBind(m_socket, localAddress, 0, m_irp);	
+    KeWaitForSingleObject(&m_syncEvent, Executive, KernelMode, FALSE, NULL);
+    
+    DPF(D_TERSE, ("WskBind: %x", m_irp->IoStatus.Status));
+    
+    if (!NT_SUCCESS(m_irp->IoStatus.Status)) {
+        DPF(D_TERSE, ("Failed to bind socket: %x", m_irp->IoStatus.Status));
+        if(m_socket) {
+            IoReuseIrp(m_irp, STATUS_UNSUCCESSFUL);
+            IoSetCompletionRoutine(m_irp, WskSampleSyncIrpCompletionRoutine, &m_syncEvent, TRUE, TRUE, TRUE);
+            ((PWSK_PROVIDER_BASIC_DISPATCH)m_socket->Dispatch)->WskCloseSocket(m_socket, m_irp);
+            KeWaitForSingleObject(&m_syncEvent, Executive, KernelMode, FALSE, NULL);
+        }
+        
+        return;
+    }
+}
+
+//=============================================================================
+void CSaveData::SendData(ULONG offset, ULONG length) {
+    WSK_BUF             wskbuf;
+    SOCKADDR_IN         locaddr;
+    SOCKADDR_IN         remaddr;
+
+    DPF_ENTER(("[CSaveData::SendData offset=%d length=%d]", offset, length));
+        
+    remaddr.sin_family                 = AF_INET;
+	remaddr.sin_port                   = RtlUshortByteSwap(4010);
+	remaddr.sin_addr.S_un.S_un_b.s_b1  = 192;
+	remaddr.sin_addr.S_un.S_un_b.s_b2  = 168;
+	remaddr.sin_addr.S_un.S_un_b.s_b3  = 178;
+	remaddr.sin_addr.S_un.S_un_b.s_b4  = 129;
+
+    locaddr.sin_family                 = AF_INET;
+	locaddr.sin_port                   = RtlUshortByteSwap(4009);
+	locaddr.sin_addr.S_un.S_un_b.s_b1  = 0;
+	locaddr.sin_addr.S_un.S_un_b.s_b2  = 0;
+	locaddr.sin_addr.S_un.S_un_b.s_b3  = 0;
+	locaddr.sin_addr.S_un.S_un_b.s_b4  = 0;
+    
+    // initialize transport if not done yet
+    if (!m_bInitialized) {
+        this->CreateSocket((PSOCKADDR)&locaddr);        
+        m_bInitialized = TRUE;
+        
+        return;
+    }
+    
+    wskbuf.Mdl = m_pDataMdl;
+    wskbuf.Offset = offset;
+    wskbuf.Length = length;
+    
+    if (m_socket) {
+        IoReuseIrp(m_irp, STATUS_UNSUCCESSFUL);
+        IoSetCompletionRoutine(m_irp, WskSampleSyncIrpCompletionRoutine, &m_syncEvent, TRUE, TRUE, TRUE);
+        ((PWSK_PROVIDER_DATAGRAM_DISPATCH)(m_socket->Dispatch))->WskSendTo(m_socket, &wskbuf, 0, (PSOCKADDR)&remaddr, 0, NULL, m_irp);
+        KeWaitForSingleObject(&m_syncEvent, Executive, KernelMode, FALSE, NULL);
+        
+        DPF(D_TERSE, ("WskSendTo: %x", m_irp->IoStatus.Status));
+    }
+}
+
+#pragma code_seg("PAGE")
+//=============================================================================
+NTSTATUS CSaveData::SetDataFormat(IN PKSDATAFORMAT pDataFormat) {
     PAGED_CODE();
     NTSTATUS ntStatus = STATUS_SUCCESS;
  
@@ -467,26 +449,8 @@ NTSTATUS CSaveData::SetDataFormat(
 } // SetDataFormat
 
 //=============================================================================
-void CSaveData::ReadData(
-    IN PBYTE                    pBuffer,
-    IN ULONG                    ulByteCount
-)
-{
-    UNREFERENCED_PARAMETER(pBuffer);
-    UNREFERENCED_PARAMETER(ulByteCount);
-
-    PAGED_CODE();
-
-    // Not implemented yet.
-} // ReadData
-
-//=============================================================================
 #pragma code_seg()
-void CSaveData::SaveFrame(
-    IN ULONG                    ulFrameNo,
-    IN ULONG                    ulDataSize
-)
-{
+void CSaveData::SaveFrame(IN ULONG ulFrameNo, IN ULONG ulDataSize) {
     PSAVEWORKER_PARAM           pParam = NULL;
 
     DPF_ENTER(("[CSaveData::SaveFrame]"));
@@ -495,16 +459,16 @@ void CSaveData::SaveFrame(
     if (pParam) {
         pParam->pSaveData = this;
         pParam->ulFrameNo = ulFrameNo;
+        pParam->ulOffset = ulFrameNo * m_ulFrameSize;
         pParam->ulDataSize = ulDataSize;
-        pParam->pData = m_pDataBuffer + ulFrameNo * m_ulFrameSize;
         KeResetEvent(&pParam->EventDone);
         IoQueueWorkItem(pParam->WorkItem, SaveFrameWorkerCallback, CriticalWorkQueue, (PVOID)pParam);
     }
 } // SaveFrame
+
 #pragma code_seg("PAGE")
 //=============================================================================
-void CSaveData::WaitAllWorkItems(void)
-{
+void CSaveData::WaitAllWorkItems(void) {
     PAGED_CODE();
 
     DPF_ENTER(("[CSaveData::WaitAllWorkItems]"));
@@ -520,11 +484,7 @@ void CSaveData::WaitAllWorkItems(void)
 
 #pragma code_seg()
 //=============================================================================
-void CSaveData::WriteData(
-    IN  PBYTE                   pBuffer,
-    IN  ULONG                   ulByteCount
-)
-{
+void CSaveData::WriteData(IN PBYTE pBuffer, IN ULONG ulByteCount) {
     ASSERT(pBuffer);
 
     BOOL  fSaveFrame = FALSE;

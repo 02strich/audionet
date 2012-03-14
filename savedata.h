@@ -11,6 +11,20 @@ Abstract:
 #ifndef _MSVAD_SAVEDATA_H
 #define _MSVAD_SAVEDATA_H
 
+#pragma warning(push)
+#pragma warning(disable:4201) // nameless struct/union
+#pragma warning(disable:4214) // bit field types other than int
+
+// fix strange warnings from wsk.h
+#pragma warning(disable:4510)
+#pragma warning(disable:4512)
+#pragma warning(disable:4610)
+
+#include <ntddk.h>
+#include <wsk.h>
+
+#pragma warning(pop)
+
 //-----------------------------------------------------------------------------
 //  Forward declaration
 //-----------------------------------------------------------------------------
@@ -26,31 +40,13 @@ typedef CSaveData *PCSaveData;
 typedef struct _SAVEWORKER_PARAM {
     PIO_WORKITEM     WorkItem;
     ULONG            ulFrameNo;
+	ULONG			 ulOffset;
     ULONG            ulDataSize;
-    PBYTE            pData;
+	ULONG			 padding;
     PCSaveData       pSaveData;
     KEVENT           EventDone;
 } SAVEWORKER_PARAM;
 typedef SAVEWORKER_PARAM *PSAVEWORKER_PARAM;
-#include <poppack.h>
-
-// wave file header.
-#include <pshpack1.h>
-typedef struct _OUTPUT_FILE_HEADER {
-    DWORD           dwRiff;
-    DWORD           dwFileSize;
-    DWORD           dwWave;
-    DWORD           dwFormat;
-    DWORD           dwFormatLength;
-} OUTPUT_FILE_HEADER;
-typedef OUTPUT_FILE_HEADER *POUTPUT_FILE_HEADER;
-
-typedef struct _OUTPUT_DATA_HEADER {
-    DWORD           dwData;
-    DWORD           dwDataLength;
-} OUTPUT_DATA_HEADER;
-typedef OUTPUT_DATA_HEADER *POUTPUT_DATA_HEADER;
-
 #include <poppack.h>
 
 //-----------------------------------------------------------------------------
@@ -65,10 +61,14 @@ IO_WORKITEM_ROUTINE SaveFrameWorkerCallback;
 
 class CSaveData {
 protected:
-    UNICODE_STRING              m_FileName;         // DataFile name.
-    HANDLE                      m_FileHandle;       // DataFile handle.
+	WSK_REGISTRATION			m_wskSampleRegistration;
+	PWSK_SOCKET					m_socket;
+	PIRP						m_irp;
+	KEVENT						m_syncEvent;
+	
     PBYTE                       m_pDataBuffer;      // Data buffer.
     ULONG                       m_ulBufferSize;     // Total buffer size.
+	PMDL						m_pDataMdl;			// MDL describing the buffer
 
     ULONG                       m_ulFramePtr;       // Current Frame.
     ULONG                       m_ulFrameCount;     // Frame count.
@@ -77,12 +77,7 @@ protected:
     PBOOL                       m_fFrameUsed;       // Frame usage table.
     KSPIN_LOCK                  m_FrameInUseSpinLock; // Spinlock for synch.
 
-    OBJECT_ATTRIBUTES           m_objectAttributes; // Used for opening file.
-
-    OUTPUT_FILE_HEADER          m_FileHeader;
     PWAVEFORMATEX               m_waveFormat;
-    OUTPUT_DATA_HEADER          m_DataHeader;
-    PLARGE_INTEGER              m_pFilePtr;
 
     static PDEVICE_OBJECT       m_pDeviceObject;
     static ULONG                m_ulStreamId;
@@ -107,17 +102,14 @@ public:
 	static NTSTATUS             SetDeviceObject(IN PDEVICE_OBJECT DeviceObject);
 	static PDEVICE_OBJECT       GetDeviceObject(void);
     
-	void                        ReadData(IN PBYTE pBuffer, IN ULONG ulByteCount);
     void                        WriteData(IN PBYTE pBuffer, IN ULONG ulByteCount);
 
 private:
     static NTSTATUS             InitializeWorkItems(IN PDEVICE_OBJECT DeviceObject);
 
-    NTSTATUS                    FileClose(void);
-    NTSTATUS                    FileOpen(IN BOOL fOverWrite);
-    NTSTATUS                    FileWrite(IN PBYTE pData, IN ULONG ulDataSize);
-    NTSTATUS                    FileWriteHeader(void);
-
+	void                        CreateSocket(PSOCKADDR localAddress);
+	void						SendData(ULONG offset, ULONG length);
+	
     void                        SaveFrame(IN ULONG ulFrameNo, IN ULONG ulDataSize);
     friend VOID                 SaveFrameWorkerCallback(PDEVICE_OBJECT pDeviceObject, IN PVOID Context);
 };
