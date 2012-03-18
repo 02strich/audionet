@@ -1,3 +1,4 @@
 /objfre_win7_amd64/
 *.log
 *.err
+/objchk_win7_amd64/
