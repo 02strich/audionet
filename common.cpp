@@ -10,7 +10,7 @@ Abstract:
 
 #pragma warning (disable : 4127)
 
-#include <msvad.h>
+#include "audionet.h"
 #include "common.h"
 #include "hw.h"
 #include "savedata.h"

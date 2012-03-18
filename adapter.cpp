@@ -15,7 +15,7 @@ Abstract:
 //
 #define PUT_GUIDS_HERE
 
-#include <msvad.h>
+#include "audionet.h"
 #include "common.h"
 
 //-----------------------------------------------------------------------------

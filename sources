@@ -1,9 +1,9 @@
 TARGETTYPE=DRIVER
-TARGETNAME=vadsimpl
+TARGETNAME=audionet
 
 TARGETLIBS= \
         $(DDK_LIB_PATH)\portcls.lib \
-        $(DDK_LIB_PATH)\netio.lib \
+        $(DDK_LIB_PATH)\netio.lib   \
         $(DDK_LIB_PATH)\stdunk.lib
 
 INCLUDES= \
@@ -29,7 +29,7 @@ SOURCES=\
         hw.cpp        \
         kshelper.cpp  \
         savedata.cpp  \
-        msvad.rc      \
+        audionet.rc   \
         mintopo.cpp   \
         minstream.cpp \
         minwave.cpp

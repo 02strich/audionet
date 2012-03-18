@@ -18,7 +18,7 @@ Abstract:
 --*/
 #pragma warning (disable : 4127)
 
-#include <msvad.h>
+#include "audionet.h"
 #include "savedata.h"
 
 //=============================================================================

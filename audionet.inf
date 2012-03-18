@@ -1,16 +1,16 @@
 [Version]
 Signature="$CHICAGO$"
 Class=MEDIA
-Provider=%MSFT%
+Provider=%SCR%
 ClassGUID={4d36e96c-e325-11ce-bfc1-08002be10318}
 DriverVer = 02/22/2007, 6.0.6000.1
-CatalogFile=msvad.cat
+CatalogFile=audionet.cat
 
 [SourceDisksNames]
-222="MSVAD Driver Disk","",222
+222="AudioNet Driver Disk","",222
 
 [SourceDisksFiles]
-vadsimpl.sys=222
+audionet.sys=222
 
 ;;This syntax is only recognized on Windows XP and above- it is needed to install 64-bit drivers on
 ;;Windows Server 2003 Service Pack 1 and above.
@@ -24,97 +24,102 @@ vadsimpl.sys=222
 ;;  All of the model sections referred to are undecorated or NT-decorated, hence work on all platforms
 
 [MicrosoftDS]
-%MSVAD_Simple.DeviceDesc%=MSVAD_Simple,*MSVADSimple
+%AudioNet.DeviceDesc%=AudioNet,*MSVADSimple
 
 [MicrosoftDS.NTAMD64]
-%MSVAD_Simple.DeviceDesc%=MSVAD_Simple,*MSVADSimple
+%AudioNet.DeviceDesc%=AudioNet,*MSVADSimple
 
 [MicrosoftDS.NTIA64]
-%MSVAD_Simple.DeviceDesc%=MSVAD_Simple,*MSVADSimple
+%AudioNet.DeviceDesc%=AudioNet,*MSVADSimple
 
 [DestinationDirs]
-MSVAD_Simple.CopyList=10,system32\drivers
+AudioNet.CopyList=10,system32\drivers
 
 ;======================================================
-; MSVAD_SIMPLE
+; AudioNet
 ;======================================================
-[MSVAD_Simple]
+[AudioNet]
 AlsoInstall=ks.registration(ks.inf),wdmaudio.registration(wdmaudio.inf)
-CopyFiles=MSVAD_Simple.CopyList
-AddReg=MSVAD_Simple.AddReg
+CopyFiles=AudioNet.CopyList
+AddReg=AudioNet.AddReg
 
-[MSVAD_Simple.CopyList]
-vadsimpl.sys
+[AudioNet.CopyList]
+audionet.sys
 
-[MSVAD_Simple.Interfaces]
+[AudioNet.Interfaces]
 AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_Wave%,MSVAD.I.Wave
 AddInterface=%KSCATEGORY_RENDER%,%KSNAME_Wave%,MSVAD.I.Wave
 AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_Topology%,MSVAD.I.Topo
 
-[MSVAD_Simple.AddReg]
+[AudioNet.AddReg]
 HKR,,AssociatedFilters,,"wdmaud,redbook"
-HKR,,Driver,,vadsimpl.sys
+HKR,,Driver,,audionet.sys
 
 HKR,Drivers,SubClasses,,"wave,mixer"
 
 HKR,Drivers\wave\wdmaud.drv,Driver,,wdmaud.drv
 HKR,Drivers\mixer\wdmaud.drv,Driver,,wdmaud.drv
 
-HKR,Drivers\wave\wdmaud.drv,Description,,%MSVAD_Simple.DeviceDesc%
-HKR,Drivers\mixer\wdmaud.drv,Description,,%MSVAD_Simple.DeviceDesc%
+HKR,Drivers\wave\wdmaud.drv,Description,,%AudioNet.DeviceDesc%
+HKR,Drivers\mixer\wdmaud.drv,Description,,%AudioNet.DeviceDesc%
 
-HKLM,%MediaCategories%\%Simple.NameGuid%,Name,,%Simple.Name%
+HKLM,%MediaCategories%\%AudioNet.NameGuid%,Name,,%AudioNet.Name%
 
 ;======================================================
 ; COMMON
 ;======================================================
-[MSVAD.I.Wave]
-AddReg=MSVAD.I.Wave.AddReg
-[MSVAD.I.Wave.AddReg]
-HKR,,CLSID,,%Proxy.CLSID%
-HKR,,FriendlyName,,%MSVAD.Wave.szPname%
+[AudioNet.I.Wave]
+AddReg=AudioNet.I.Wave.AddReg
 
-[MSVAD.I.Topo]
-AddReg=MSVAD.I.Topo.AddReg
-[MSVAD.I.Topo.AddReg]
+[AudioNet.I.Wave.AddReg]
 HKR,,CLSID,,%Proxy.CLSID%
-HKR,,FriendlyName,,%MSVAD.Topo.szPname%
+HKR,,FriendlyName,,%AudioNet.Wave.szPname%
+
+[AudioNet.I.Topo]
+AddReg=AudioNet.I.Topo.AddReg
+
+[AudioNet.I.Topo.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%AudioNet.Topo.szPname%
 
 ;======================================================
 ; MSVAD_SIMPLE
 ;======================================================
-[MSVAD_Simple.NT]
+[AudioNet.NT]
 Include=ks.inf,wdmaudio.inf
 Needs=KS.Registration, WDMAUDIO.Registration
-CopyFiles=MSVAD_Simple.CopyList
-AddReg=MSVAD_Simple.AddReg
+CopyFiles=AudioNet.CopyList
+AddReg=AudioNet.AddReg
 
-[MSVAD_Simple.NT.Interfaces]
-AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_Wave%,MSVAD.I.Wave
-AddInterface=%KSCATEGORY_RENDER%,%KSNAME_Wave%,MSVAD.I.Wave
-AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_Topology%,MSVAD.I.Topo
+[AudioNet.NT.Interfaces]
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_Wave%,AudioNet.I.Wave
+AddInterface=%KSCATEGORY_RENDER%,%KSNAME_Wave%,AudioNet.I.Wave
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_Topology%,AudioNet.I.Topo
 
-[MSVAD_Simple.NT.Services]
-AddService=msvad_simple,0x00000002,msvad_Simple_Service_Inst
+[AudioNet.NT.Services]
+AddService=audionet,0x00000002,AudioNet_Service_Inst
 
-[msvad_Simple_Service_Inst]
-DisplayName=%msvad_simple.SvcDesc%
+[AudioNet_Service_Inst]
+DisplayName=%AudioNet.SvcDesc%
 ServiceType=1
 StartType=3
 ErrorControl=1
-ServiceBinary=%10%\system32\drivers\vadSimpl.sys
+ServiceBinary=%10%\system32\drivers\audionet.sys
 
 ;======================================================
 ; COMMON
 ;======================================================
 [Strings]
-MSFT="Microsoft"
-MfgName="Microsoft Audio DDK"
-MSVAD_Simple.DeviceDesc="Microsoft Virtual Audio Device (Simple) (WDM)"
+SCR="Stefan Richter"
+MfgName="Stefan Richter"
 
-MSVAD.Wave.szPname="MSVAD Wave"
-MSVAD.Topo.szPname="MSVAD Topology"
-MSVAD_MIDI="MSVAD -> WDM Midi Device"
+AudioNet.Name="AudioNet"
+AudioNet.NameGuid="{946A7B1A-EBBC-422a-A81F-F07C8D40D3B4}"
+AudioNet.DeviceDesc="AudioNet (WDM)"
+AudioNet.SvcDesc="AudioNet (WDM)"
+
+AudioNet.Wave.szPname="AudioNet Wave"
+AudioNet.Topo.szPname="AudioNet Topology"
 
 Proxy.CLSID="{17CCA71B-ECD7-11D0-B908-00A0C9223196}"
 KSCATEGORY_AUDIO="{6994AD04-93EF-11D0-A3CC-00A0C9223196}"
@@ -124,11 +129,7 @@ KSCATEGORY_CAPTURE="{65E8773D-8F56-11D0-A3B9-00A0C9223196}"
 KSNAME_Wave="Wave"
 KSNAME_Topology="Topology"
 
-msvad_simple.SvcDesc="Microsoft Virtual Audio Device (Simple) (WDM)"
-
 MediaCategories="SYSTEM\CurrentControlSet\Control\MediaCategories"
 
-Simple.NameGuid="{946A7B1A-EBBC-422a-A81F-F07C8D40D3B4}"
-Simple.Name="MSVAD (Simple)"
 
 

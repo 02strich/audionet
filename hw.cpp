@@ -9,7 +9,7 @@ Abstract:
     MSVAD HW has an array for storing mixer and volume settings
     for the topology.
 --*/
-#include <msvad.h>
+#include "audionet.h"
 #include "hw.h"
 
 //=============================================================================

@@ -1,0 +1,29 @@
+/*++
+Copyright (c) 1997-2000  Microsoft Corporation All Rights Reserved
+
+Module Name:
+    audionet.rc
+
+Abstract:
+
+--*/
+
+#include <windows.h>
+#include <ntverp.h>
+
+#define VER_FILETYPE                VFT_DRV
+#define VER_FILESUBTYPE             VFT2_DRV_SOUND
+#define VER_FILEDESCRIPTION_STR     "AudioNet Device"
+#define VER_INTERNALNAME_STR        "audionet.sys"
+#define VER_ORIGINALFILENAME_STR    "audionet.sys"
+
+#define VER_PRODUCTNAME_STR         "AudioNet Driver"
+#define VER_COMPANYNAME_STR         "AudioNet Driver"
+
+#define VER_LEGALCOPYRIGHT_YEARS    "2011-2012"
+#define VER_LEGALCOPYRIGHT_STR	    "Copyright (C) Stefan Richter " VER_LEGALCOPYRIGHT_YEARS
+
+#include "common.ver"
+
+
+

@@ -10,9 +10,8 @@ Abstract:
 
 #pragma warning (disable : 4127)
 
-#include <msvad.h>
-#include <common.h>
-#include "simple.h"
+#include "audionet.h"
+#include "common.h"
 #include "minwave.h"
 #include "minstream.h"
 #include "wavtable.h"
