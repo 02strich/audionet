@@ -15,6 +15,7 @@ Abstract:
 #include <stdunk.h>
 #include <ksdebug.h>
 #include "kshelper.h"
+#include "prvprop.h"
 
 //=============================================================================
 // Defines

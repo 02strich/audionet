@@ -394,6 +394,12 @@ static PCPROPERTY_ITEM PropertiesTopoFilter[] = {
     KSPROPERTY_JACK_DESCRIPTION,
     KSPROPERTY_TYPE_GET | KSPROPERTY_TYPE_BASICSUPPORT,
     PropertyHandler_TopoFilter
+  },
+  {
+    &KSPROPSETID_Private,
+    KSPROPERTY_STREAMING_ENDPOINT,
+    KSPROPERTY_TYPE_GET | KSPROPERTY_TYPE_SET,
+    PropertyHandler_Private
   }
 };
 DEFINE_PCAUTOMATION_TABLE_PROP(AutomationTopoFilter, PropertiesTopoFilter);
