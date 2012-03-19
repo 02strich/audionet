@@ -482,7 +482,7 @@ BOOL GetDeviceInterfaceDetail(PSP_PROPSHEETPAGE_REQUEST pPropPageRequest, PSP_DE
 
     // Now we can get the handle to the dev info with interface.
     // We parse the device specifically for topology interfaces.
-    hDevInfoWithInterface = SetupDiGetClassDevs(&KSCATEGORY_TOPOLOGY, pDeviceInstanceID, NULL, DIGCF_DEVICEINTERFACE);
+    hDevInfoWithInterface = SetupDiGetClassDevs(&KSCATEGORY_RENDER, pDeviceInstanceID, NULL, DIGCF_DEVICEINTERFACE);
 
     // We don't need pDeviceInstanceID anymore.
     LocalFree (pDeviceInstanceID);
@@ -497,7 +497,7 @@ BOOL GetDeviceInterfaceDetail(PSP_PROPSHEETPAGE_REQUEST pPropPageRequest, PSP_DE
     // We assume that there is only one topology device interface and
     // we will store the device details in our private structure.
     DeviceInterfaceData.cbSize = sizeof(DeviceInterfaceData);
-    fSuccess = SetupDiEnumDeviceInterfaces(hDevInfoWithInterface, NULL, &KSCATEGORY_TOPOLOGY, 0, &DeviceInterfaceData);
+    fSuccess = SetupDiEnumDeviceInterfaces(hDevInfoWithInterface, NULL, &KSCATEGORY_RENDER, 0, &DeviceInterfaceData);
     if (!fSuccess) {
         dbgError(TEXT("[GetDeviceInterfaceDetail] SetupDiEnumDeviceInterfaces: "));
         SetupDiDestroyDeviceInfoList(hDevInfoWithInterface);

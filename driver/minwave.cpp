@@ -629,6 +629,75 @@ Return Value:
 } // PropertyHandlerGeneric
 
 //=============================================================================
+NTSTATUS CMiniportWaveCyclic::PropertyHandlerPrivate(IN PPCPROPERTY_REQUEST PropertyRequest)
+/*++
+Routine Description:
+  This is a private property that returns some AC97 codec features.
+  This routine gets called whenever the topology filter gets a property
+  request with KSPROSETPID_Private and KSPROPERTY_AC97_FEATURES set. It is not
+  a node property but a filter property (you don't have to specify a node).
+
+Arguments:
+  PropertyRequest - 
+
+Return Value:
+  NT status code.
+--*/
+{
+    PAGED_CODE ();
+
+    ASSERT (PropertyRequest);
+
+    DPF_ENTER(("[CMiniportWaveCyclic::PropertyHandler_Private]"));
+
+    NTSTATUS        ntStatus = STATUS_INVALID_PARAMETER;
+    CMiniportTopology *that = (CMiniportTopology*) PropertyRequest->MajorTarget;
+
+    ASSERT (that);
+
+    if (PropertyRequest->Verb & KSPROPERTY_TYPE_GET) {
+        // Check the ID ("function" in "group").
+        if (PropertyRequest->PropertyItem->Id != KSPROPERTY_STREAMING_ENDPOINT)
+            return ntStatus;
+        
+        // validate buffer size.
+        if (PropertyRequest->ValueSize < sizeof (AudioNetServer))
+            return ntStatus;
+        
+        // The "Value" is the out buffer that you pass in DeviceIoControl call.
+        PAudioNetServer pAudioNetServer = (PAudioNetServer) PropertyRequest->Value;
+        if (!pAudioNetServer)
+            return ntStatus;
+        
+        // copy value
+        RtlCopyMemory(pAudioNetServer->name, m_ServerName, 255);
+        
+		ntStatus = STATUS_SUCCESS;
+    } else if (PropertyRequest->Verb & KSPROPERTY_TYPE_SET) {
+        // This is the only property for a SET.
+        if (PropertyRequest->PropertyItem->Id != KSPROPERTY_STREAMING_ENDPOINT)
+            return ntStatus;
+        
+        // validate buffer size.
+        if (PropertyRequest->ValueSize < sizeof (AudioNetServer))
+            return ntStatus;
+        
+        // The "Value" is the out buffer that you pass in DeviceIoControl call.
+        PAudioNetServer pAudioNetServer = (PAudioNetServer) PropertyRequest->Value;
+        if (!pAudioNetServer)
+            return ntStatus;
+        
+        // copy value
+        RtlCopyMemory(m_ServerName, pAudioNetServer->name, 255);
+        
+        // we seem to be successful
+		ntStatus = STATUS_SUCCESS;
+    }
+
+    return ntStatus;
+}
+
+//=============================================================================
 NTSTATUS CMiniportWaveCyclic::ValidateFormat(
     IN  PKSDATAFORMAT           pDataFormat
 )
@@ -790,6 +859,31 @@ Return Value:
 
     return ntStatus;
 } // PropertyHandler_WaveFilter
+
+//=============================================================================
+NTSTATUS PropertyHandler_Private(IN PPCPROPERTY_REQUEST PropertyRequest)
+/*++
+Routine Description:
+  Redirects property request to miniport object
+
+Arguments:
+  PropertyRequest - 
+
+Return Value:
+  NT status code.
+--*/
+{
+    PAGED_CODE();
+
+    ASSERT(PropertyRequest);
+
+    DPF_ENTER(("[PropertyHandler_Private]"));
+
+    // PropertryRequest structure is filled by portcls. 
+    // MajorTarget is a pointer to miniport object for miniports.
+    //
+    return ((PCMiniportWaveCyclic) (PropertyRequest->MajorTarget))->PropertyHandlerPrivate(PropertyRequest);
+} // PropertyHandler_Topology
 
 
 #pragma code_seg()

@@ -179,6 +179,12 @@ static PCPROPERTY_ITEM PropertiesWaveFilter[] = {
     KSPROPERTY_PIN_PROPOSEDATAFORMAT,
     KSPROPERTY_TYPE_SET | KSPROPERTY_TYPE_BASICSUPPORT,
     PropertyHandler_WaveFilter
+  },
+  {
+    &KSPROPSETID_Private,
+    KSPROPERTY_STREAMING_ENDPOINT,
+    KSPROPERTY_TYPE_GET | KSPROPERTY_TYPE_SET,
+    PropertyHandler_Private
   }
 };
 DEFINE_PCAUTOMATION_TABLE_PROP(AutomationWaveFilter, PropertiesWaveFilter);

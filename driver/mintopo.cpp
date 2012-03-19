@@ -765,48 +765,6 @@ Return Value:
 }
 
 //=============================================================================
-NTSTATUS CMiniportTopology::PropertyHandler_Private(IN PPCPROPERTY_REQUEST PropertyRequest)
-/*++
-Routine Description:
-  This is a private property that returns some AC97 codec features.
-  This routine gets called whenever the topology filter gets a property
-  request with KSPROSETPID_Private and KSPROPERTY_AC97_FEATURES set. It is not
-  a node property but a filter property (you don't have to specify a node).
-
-Arguments:
-  PropertyRequest - 
-
-Return Value:
-  NT status code.
---*/
-{
-    PAGED_CODE ();
-
-    ASSERT (PropertyRequest);
-
-    DPF_ENTER(("[CMiniportTopology::PropertyHandler_Private]"));
-
-    NTSTATUS        ntStatus = STATUS_INVALID_PARAMETER;
-    CMiniportTopology *that = (CMiniportTopology*) PropertyRequest->MajorTarget;
-
-    ASSERT (that);
-
-    if (PropertyRequest->Verb & KSPROPERTY_TYPE_GET) {
-        // Check the ID ("function" in "group").
-        if (PropertyRequest->PropertyItem->Id != KSPROPERTY_STREAMING_ENDPOINT)
-            return ntStatus;
-		ntStatus = STATUS_SUCCESS;
-    } else if (PropertyRequest->Verb & KSPROPERTY_TYPE_SET) {
-        // This is the only property for a SET.
-        if (PropertyRequest->PropertyItem->Id != KSPROPERTY_STREAMING_ENDPOINT)
-            return ntStatus;
-		ntStatus = STATUS_SUCCESS;
-    }
-
-    return ntStatus;
-}
-
-//=============================================================================
 NTSTATUS PropertyHandler_TopoFilter(IN PPCPROPERTY_REQUEST PropertyRequest)
 /*++
 Routine Description:
@@ -861,31 +819,6 @@ Return Value:
     // MajorTarget is a pointer to miniport object for miniports.
     //
     return ((PCMiniportTopology) (PropertyRequest->MajorTarget))->PropertyHandlerGeneric(PropertyRequest);
-} // PropertyHandler_Topology
-
-//=============================================================================
-NTSTATUS PropertyHandler_Private(IN PPCPROPERTY_REQUEST PropertyRequest)
-/*++
-Routine Description:
-  Redirects property request to miniport object
-
-Arguments:
-  PropertyRequest - 
-
-Return Value:
-  NT status code.
---*/
-{
-    PAGED_CODE();
-
-    ASSERT(PropertyRequest);
-
-    DPF_ENTER(("[PropertyHandler_Topology]"));
-
-    // PropertryRequest structure is filled by portcls. 
-    // MajorTarget is a pointer to miniport object for miniports.
-    //
-    return ((PCMiniportTopology) (PropertyRequest->MajorTarget))->PropertyHandler_Private(PropertyRequest);
 } // PropertyHandler_Topology
 
 #pragma code_seg()

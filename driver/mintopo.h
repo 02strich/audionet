@@ -48,12 +48,10 @@ public:
     NTSTATUS PropertyHandlerMuxSource(IN PPCPROPERTY_REQUEST PropertyRequest);
     NTSTATUS PropertyHandlerVolume(IN PPCPROPERTY_REQUEST PropertyRequest);
     NTSTATUS PropertyHandlerDevSpecific(IN PPCPROPERTY_REQUEST PropertyRequest);
-	NTSTATUS PropertyHandler_Private(IN PPCPROPERTY_REQUEST PropertyRequest);
 };
 typedef CMiniportTopology *PCMiniportTopology;
 
 extern NTSTATUS PropertyHandler_TopoFilter(IN PPCPROPERTY_REQUEST PropertyRequest);
-extern NTSTATUS PropertyHandler_Private(IN PPCPROPERTY_REQUEST PropertyRequest);
 
 #endif
 

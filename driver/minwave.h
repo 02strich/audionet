@@ -57,6 +57,9 @@ protected:
     ULONG                       m_MaxBitsPerSamplePcm;
     ULONG                       m_MinSampleRatePcm;
     ULONG                       m_MaxSampleRatePcm;
+	
+	// Settings for new streams
+	char						m_ServerName[255];
 
 protected:
     NTSTATUS                    ValidateFormat(IN PKSDATAFORMAT pDataFormat);
@@ -73,6 +76,7 @@ public:
     NTSTATUS                    PropertyHandlerProposedFormat(IN PPCPROPERTY_REQUEST PropertyRequest);
     NTSTATUS                    PropertyHandlerCpuResources(IN PPCPROPERTY_REQUEST PropertyRequest);
     NTSTATUS                    PropertyHandlerGeneric(IN PPCPROPERTY_REQUEST PropertyRequest);
+	NTSTATUS                    PropertyHandlerPrivate(IN PPCPROPERTY_REQUEST PropertyRequest);
 	
 	//STDMETHODIMP                GetDescription(OUT PPCFILTER_DESCRIPTOR *Description);
     //STDMETHODIMP                Init(IN PUNKNOWN UnknownAdapter, IN PRESOURCELIST ResourceList, IN PPORTWAVECYCLIC Port);

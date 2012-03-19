@@ -156,4 +156,7 @@ extern NTSTATUS PropertyHandler_Wave(IN PPCPROPERTY_REQUEST PropertyRequest);
 // Handles the GeneralComponentId request.
 extern NTSTATUS PropertyHandler_WaveFilter(IN PPCPROPERTY_REQUEST PropertyRequest);
 
+// Private properties on wave filter
+extern NTSTATUS PropertyHandler_Private(IN PPCPROPERTY_REQUEST PropertyRequest);
+
 #endif
