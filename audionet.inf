@@ -11,6 +11,7 @@ CatalogFile=audionet.cat
 
 [SourceDisksFiles]
 audionet.sys=222
+audionet_prop.dll=222
 
 ;;This syntax is only recognized on Windows XP and above- it is needed to install 64-bit drivers on
 ;;Windows Server 2003 Service Pack 1 and above.
@@ -34,14 +35,15 @@ audionet.sys=222
 
 [DestinationDirs]
 AudioNet.CopyList=10,system32\drivers
+AudioNetProp.CopyList=10,system32
 
 ;======================================================
 ; AudioNet
 ;======================================================
 [AudioNet]
 AlsoInstall=ks.registration(ks.inf),wdmaudio.registration(wdmaudio.inf)
-CopyFiles=AudioNet.CopyList
-AddReg=AudioNet.AddReg
+CopyFiles=AudioNet.CopyList,AudioNetProp.CopyList
+AddReg=AudioNet.AddReg,AudioNetProp.AddReg
 
 [AudioNet.CopyList]
 audionet.sys
@@ -66,6 +68,15 @@ HKR,Drivers\mixer\wdmaud.drv,Description,,%AudioNet.DeviceDesc%
 HKLM,%MediaCategories%\%AudioNet.NameGuid%,Name,,%AudioNet.Name%
 
 ;======================================================
+; AudioNet Property Page
+;======================================================
+[AudioNetProp.CopyList]
+audionet_prop.dll
+
+[AudioNetProp.AddReg]
+HKR,,EnumPropPages32,,"audionet_prop.dll,AudioNetPropPageProvider"
+
+;======================================================
 ; COMMON
 ;======================================================
 [AudioNet.I.Wave]
@@ -88,8 +99,8 @@ HKR,,FriendlyName,,%AudioNet.Topo.szPname%
 [AudioNet.NT]
 Include=ks.inf,wdmaudio.inf
 Needs=KS.Registration, WDMAUDIO.Registration
-CopyFiles=AudioNet.CopyList
-AddReg=AudioNet.AddReg
+CopyFiles=AudioNet.CopyList,AudioNetProp.CopyList
+AddReg=AudioNet.AddReg,AudioNetProp.AddReg
 
 [AudioNet.NT.Interfaces]
 AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_Wave%,AudioNet.I.Wave
