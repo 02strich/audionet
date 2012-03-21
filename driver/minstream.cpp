@@ -139,7 +139,7 @@ Return Value:
         if (!m_fCapture) {
             ntStatus = m_SaveData.SetDataFormat(DataFormat_);
             if (NT_SUCCESS(ntStatus)) {
-                ntStatus = m_SaveData.Initialize();
+                ntStatus = m_SaveData.Initialize(m_pMiniport->m_cServerName);
             }
         }
     }

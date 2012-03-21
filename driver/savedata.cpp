@@ -197,12 +197,15 @@ PSAVEWORKER_PARAM CSaveData::GetNewWorkItem(void) {
 
 #pragma code_seg("PAGE")
 //=============================================================================
-NTSTATUS CSaveData::Initialize(void) {
+NTSTATUS CSaveData::Initialize(const wchar_t* cServerName) {
     PAGED_CODE();
 
     NTSTATUS          ntStatus = STATUS_SUCCESS;
 
     DPF_ENTER(("[CSaveData::Initialize]"));
+    
+    // copy over servername
+    RtlCopyMemory(m_cServerName, cServerName, sizeof(m_cServerName));    
 
     // Allocate memory for data buffer.
     if (NT_SUCCESS(ntStatus)) {
@@ -301,10 +304,19 @@ VOID SaveFrameWorkerCallback(PDEVICE_OBJECT pDeviceObject, IN  PVOID  Context) {
 
 #pragma code_seg()
 //=============================================================================
-void CSaveData::CreateSocket(PSOCKADDR localAddress) {
+void CSaveData::CreateSocket(void) {
     NTSTATUS            status;
     WSK_PROVIDER_NPI    pronpi;
+    PSOCKADDR           locaddr;
+    SOCKADDR_IN         locaddr4 = { AF_INET,  RtlUshortByteSwap(4009), 0, 0};
+    SOCKADDR_IN6        locaddr6 = { AF_INET6, RtlUshortByteSwap(4009), 0, IN6ADDR_ANY_INIT, 0};
+    
+    // server name lookup
+    UNICODE_STRING      uniNodeName;
+    PADDRINFOEXW        results;
 
+    DPF_ENTER(("[CSaveData::CreateSocket] server name: %ws", m_cServerName));
+    
     // capture WSK provider
     status = WskCaptureProviderNPI(&m_wskSampleRegistration, WSK_INFINITE_WAIT, &pronpi);
     if(!NT_SUCCESS(status)){
@@ -312,12 +324,64 @@ void CSaveData::CreateSocket(PSOCKADDR localAddress) {
         return;
     }
     
+    // convert server name to UNICODE_STRING
+    RtlInitUnicodeString(&uniNodeName, m_cServerName);
+    
+    // resolve configured server name
+    IoReuseIrp(m_irp, STATUS_UNSUCCESSFUL);
+    IoSetCompletionRoutine(m_irp, WskSampleSyncIrpCompletionRoutine, &m_syncEvent, TRUE, TRUE, TRUE);    
+    pronpi.Dispatch->WskGetAddressInfo (
+        pronpi.Client,
+        &uniNodeName,
+        NULL,
+        NS_ALL,
+        NULL,   // Provider
+        NULL,
+        &results, 
+        NULL,   // OwningProcess
+        NULL,   // OwningThread
+        m_irp);
+    KeWaitForSingleObject(&m_syncEvent, Executive, KernelMode, FALSE, NULL);
+    
+    DPF(D_TERSE, ("WskGetAddressInfo: %x", m_irp->IoStatus.Status));
+    if (!NT_SUCCESS(m_irp->IoStatus.Status)) {
+        DPF(D_TERSE, ("WskGetAddressInfo failed: %x.", m_irp->IoStatus.Status));
+        
+        // release the provider again, as we are finished with it
+        WskReleaseProviderNPI(&m_wskSampleRegistration);
+        
+        return;
+    } else if (results->ai_family == AF_INET) {
+        // copy remote address and set port
+        RtlCopyMemory(&m_sServerAddr, results->ai_addr, sizeof(SOCKADDR_IN));
+        ((PSOCKADDR_IN)&m_sServerAddr)->sin_port = RtlUshortByteSwap(4010);
+        
+        // create IPv4 socket
+        locaddr = (PSOCKADDR) &locaddr4;
+    } else if (results->ai_family == AF_INET6) {
+        RtlCopyMemory(&m_sServerAddr, results->ai_addr, sizeof(SOCKADDR_IN6));
+        ((PSOCKADDR_IN6)&m_sServerAddr)->sin6_port = RtlUshortByteSwap(4010);
+        
+        // create IPv6 socket
+        locaddr = (PSOCKADDR) &locaddr6;
+    } else {
+        DPF(D_TERSE, ("WskGetAddressInfo did not find IPv4 or IPv6 address."));
+        
+        // release the provider again, as we are finished with it
+        WskReleaseProviderNPI(&m_wskSampleRegistration);
+        
+        return;
+    }
+    pronpi.Dispatch->WskFreeAddressInfo(pronpi.Client, results);
+    
+    DPF(D_TERSE, ("ss_family: %x", m_sServerAddr.ss_family));
+    
     // create socket
     IoReuseIrp(m_irp, STATUS_UNSUCCESSFUL);
     IoSetCompletionRoutine(m_irp, WskSampleSyncIrpCompletionRoutine, &m_syncEvent, TRUE, TRUE, TRUE);    
     pronpi.Dispatch->WskSocket(
         pronpi.Client,
-        AF_INET,
+        m_sServerAddr.ss_family,
         SOCK_DGRAM,
         IPPROTO_UDP,
         WSK_FLAG_DATAGRAM_SOCKET,
@@ -340,6 +404,10 @@ void CSaveData::CreateSocket(PSOCKADDR localAddress) {
             ((PWSK_PROVIDER_BASIC_DISPATCH)m_socket->Dispatch)->WskCloseSocket(m_socket, m_irp);
             KeWaitForSingleObject(&m_syncEvent, Executive, KernelMode, FALSE, NULL);
         }
+        
+        // release the provider again, as we are finished with it
+        WskReleaseProviderNPI(&m_wskSampleRegistration);
+        
         return;
     }
     
@@ -351,8 +419,8 @@ void CSaveData::CreateSocket(PSOCKADDR localAddress) {
 
     // bind the socket
     IoReuseIrp(m_irp, STATUS_UNSUCCESSFUL);
-    IoSetCompletionRoutine(m_irp, WskSampleSyncIrpCompletionRoutine, &m_syncEvent, TRUE, TRUE, TRUE);    
-    status = ((PWSK_PROVIDER_CONNECTION_DISPATCH)(m_socket->Dispatch))->WskBind(m_socket, localAddress, 0, m_irp);	
+    IoSetCompletionRoutine(m_irp, WskSampleSyncIrpCompletionRoutine, &m_syncEvent, TRUE, TRUE, TRUE);
+    status = ((PWSK_PROVIDER_DATAGRAM_DISPATCH)(m_socket->Dispatch))->WskBind(m_socket, locaddr, 0, m_irp);	
     KeWaitForSingleObject(&m_syncEvent, Executive, KernelMode, FALSE, NULL);
     
     DPF(D_TERSE, ("WskBind: %x", m_irp->IoStatus.Status));
@@ -373,28 +441,12 @@ void CSaveData::CreateSocket(PSOCKADDR localAddress) {
 //=============================================================================
 void CSaveData::SendData(ULONG offset, ULONG length) {
     WSK_BUF             wskbuf;
-    SOCKADDR_IN         locaddr;
-    SOCKADDR_IN         remaddr;
 
     DPF_ENTER(("[CSaveData::SendData offset=%d length=%d]", offset, length));
-        
-    remaddr.sin_family                 = AF_INET;
-	remaddr.sin_port                   = RtlUshortByteSwap(4010);
-	remaddr.sin_addr.S_un.S_un_b.s_b1  = 192;
-	remaddr.sin_addr.S_un.S_un_b.s_b2  = 168;
-	remaddr.sin_addr.S_un.S_un_b.s_b3  = 178;
-	remaddr.sin_addr.S_un.S_un_b.s_b4  = 129;
-
-    locaddr.sin_family                 = AF_INET;
-	locaddr.sin_port                   = RtlUshortByteSwap(4009);
-	locaddr.sin_addr.S_un.S_un_b.s_b1  = 0;
-	locaddr.sin_addr.S_un.S_un_b.s_b2  = 0;
-	locaddr.sin_addr.S_un.S_un_b.s_b3  = 0;
-	locaddr.sin_addr.S_un.S_un_b.s_b4  = 0;
     
     // initialize transport if not done yet
     if (!m_bInitialized) {
-        this->CreateSocket((PSOCKADDR)&locaddr);        
+        this->CreateSocket();        
         m_bInitialized = TRUE;
         
         return;
@@ -407,7 +459,7 @@ void CSaveData::SendData(ULONG offset, ULONG length) {
     if (m_socket) {
         IoReuseIrp(m_irp, STATUS_UNSUCCESSFUL);
         IoSetCompletionRoutine(m_irp, WskSampleSyncIrpCompletionRoutine, &m_syncEvent, TRUE, TRUE, TRUE);
-        ((PWSK_PROVIDER_DATAGRAM_DISPATCH)(m_socket->Dispatch))->WskSendTo(m_socket, &wskbuf, 0, (PSOCKADDR)&remaddr, 0, NULL, m_irp);
+        ((PWSK_PROVIDER_DATAGRAM_DISPATCH)(m_socket->Dispatch))->WskSendTo(m_socket, &wskbuf, 0, (PSOCKADDR)&m_sServerAddr, 0, NULL, m_irp);
         KeWaitForSingleObject(&m_syncEvent, Executive, KernelMode, FALSE, NULL);
         
         DPF(D_TERSE, ("WskSendTo: %x", m_irp->IoStatus.Status));

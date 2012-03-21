@@ -86,12 +86,15 @@ protected:
     BOOL                        m_fWriteDisabled;
 
     BOOL                        m_bInitialized;
+	
+	wchar_t						m_cServerName[255];
+	SOCKADDR_STORAGE       		m_sServerAddr;
 
 public:
     CSaveData();
     ~CSaveData();
 
-	NTSTATUS                    Initialize(void);
+	NTSTATUS                    Initialize(const wchar_t* cServerName);
 	NTSTATUS                    SetDataFormat(IN  PKSDATAFORMAT pDataFormat);
 	void                        Disable(BOOL fDisable);
 	
@@ -107,7 +110,7 @@ public:
 private:
     static NTSTATUS             InitializeWorkItems(IN PDEVICE_OBJECT DeviceObject);
 
-	void                        CreateSocket(PSOCKADDR localAddress);
+	void                        CreateSocket(void);
 	void						SendData(ULONG offset, ULONG length);
 	
     void                        SaveFrame(IN ULONG ulFrameNo, IN ULONG ulDataSize);

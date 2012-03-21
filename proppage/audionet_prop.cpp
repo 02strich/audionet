@@ -265,8 +265,8 @@ BOOL AudioNetPropPage_OnInitDialog(HWND ParentHwnd, HWND FocusHwnd, LPARAM lPara
     // get current value
     pAudioNetServer = (PAudioNetServer)((LPPROPSHEETPAGE)lParam)->lParam;
     
-    // convert ASCII servername to unicode
-    mbstowcs(wServerName, pAudioNetServer->name, 255);
+    // copy string to local buffer
+    wcsncpy(wServerName, pAudioNetServer->name, 255);
     
     // set the server name
     SetWindowText(GetDlgItem(ParentHwnd, IDC_SERVERNAME), wServerName);
@@ -310,7 +310,7 @@ BOOL AudioNetPropPage_OnApplyDialog(HWND ParentHwnd)
     }
     
     // copy value to AudioNetServer structure
-    wcstombs(pAudioNetServer->name, (const wchar_t *)&wServerName, 255);
+    wcsncpy(pAudioNetServer->name, (const wchar_t *)&wServerName, 255);
 
     // Set the AudioNet server name through the private property call.
     SetAudioNetServer(gpDeviceInterfaceDetailData, pAudioNetServer);

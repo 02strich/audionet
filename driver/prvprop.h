@@ -29,7 +29,7 @@ const int KSPROPERTY_STREAMING_ENDPOINT = 1;
 // Types
 //=============================================================================
 typedef struct {
-	char name[255];
+	wchar_t name[255];
 } AudioNetServer;
 typedef AudioNetServer *PAudioNetServer;
 

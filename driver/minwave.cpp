@@ -670,7 +670,7 @@ Return Value:
             return ntStatus;
         
         // copy value
-        RtlCopyMemory(pAudioNetServer->name, m_ServerName, 255);
+        RtlCopyMemory(pAudioNetServer->name, m_cServerName, sizeof(m_cServerName));
         
 		ntStatus = STATUS_SUCCESS;
     } else if (PropertyRequest->Verb & KSPROPERTY_TYPE_SET) {
@@ -688,7 +688,7 @@ Return Value:
             return ntStatus;
         
         // copy value
-        RtlCopyMemory(m_ServerName, pAudioNetServer->name, 255);
+        RtlCopyMemory(m_cServerName, pAudioNetServer->name, sizeof(m_cServerName));
         
         // we seem to be successful
 		ntStatus = STATUS_SUCCESS;

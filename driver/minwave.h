@@ -59,7 +59,7 @@ protected:
     ULONG                       m_MaxSampleRatePcm;
 	
 	// Settings for new streams
-	char						m_ServerName[255];
+	wchar_t						m_cServerName[255];
 
 protected:
     NTSTATUS                    ValidateFormat(IN PKSDATAFORMAT pDataFormat);
