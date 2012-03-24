@@ -25,7 +25,7 @@ Abstract:
 // Defines
 //=============================================================================
 #define DEFAULT_FRAME_COUNT         5
-#define DEFAULT_FRAME_SIZE          PAGE_SIZE
+#define DEFAULT_FRAME_SIZE          2048
 #define DEFAULT_BUFFER_SIZE         DEFAULT_FRAME_SIZE * DEFAULT_FRAME_COUNT
 
 #define MAX_WORKER_ITEM_COUNT       1
@@ -296,6 +296,8 @@ VOID SaveFrameWorkerCallback(PDEVICE_OBJECT pDeviceObject, IN  PVOID  Context) {
         pSaveData = pParam->pSaveData;
         pSaveData->SendData(pParam->ulOffset, pParam->ulDataSize);
         
+        DPF(D_TERSE, ("[SaveFrameWorkerCallback SendData returned ulFrameNo=%d]", pParam->ulFrameNo));
+        
         InterlockedExchange((LONG *)&(pSaveData->m_fFrameUsed[pParam->ulFrameNo]), FALSE);
     }
 
@@ -373,8 +375,6 @@ void CSaveData::CreateSocket(void) {
         return;
     }
     pronpi.Dispatch->WskFreeAddressInfo(pronpi.Client, results);
-    
-    DPF(D_TERSE, ("ss_family: %x", m_sServerAddr.ss_family));
     
     // create socket
     IoReuseIrp(m_irp, STATUS_UNSUCCESSFUL);
@@ -505,7 +505,7 @@ NTSTATUS CSaveData::SetDataFormat(IN PKSDATAFORMAT pDataFormat) {
 void CSaveData::SaveFrame(IN ULONG ulFrameNo, IN ULONG ulDataSize) {
     PSAVEWORKER_PARAM           pParam = NULL;
 
-    DPF_ENTER(("[CSaveData::SaveFrame]"));
+    DPF_ENTER(("[CSaveData::SaveFrame ulFrameNo=%d]", ulFrameNo));
 
     pParam = GetNewWorkItem();
     if (pParam) {
@@ -515,6 +515,9 @@ void CSaveData::SaveFrame(IN ULONG ulFrameNo, IN ULONG ulDataSize) {
         pParam->ulDataSize = ulDataSize;
         KeResetEvent(&pParam->EventDone);
         IoQueueWorkItem(pParam->WorkItem, SaveFrameWorkerCallback, CriticalWorkQueue, (PVOID)pParam);
+    } else {
+        // cannot save this frame as no workers are available, will just drop it
+        InterlockedExchange((LONG *)&(m_fFrameUsed[ulFrameNo]), FALSE);
     }
 } // SaveFrame
 
@@ -602,7 +605,7 @@ void CSaveData::WriteData(IN PBYTE pBuffer, IN ULONG ulByteCount) {
         }
     } else {
         KeReleaseSpinLockFromDpcLevel( &m_FrameInUseSpinLock );
-        DPF(D_BLAB, ("[Frame %d is in use]", m_ulFramePtr));
+        DPF(D_TERSE, ("[Frame %d is in use]", m_ulFramePtr));
     }
 
 } // WriteData
