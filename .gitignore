@@ -1,5 +1,12 @@
+/.komodotools/
 /driver/objfre_win7_amd64/
 /driver/objchk_win7_amd64/
+/proppage/objfre_win7_amd64/
+/proppage/objchk_win7_amd64/
+
 *.log
 *.err
+*.dll
+*.sys
+*komodoproject
 
