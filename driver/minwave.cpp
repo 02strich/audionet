@@ -651,9 +651,8 @@ Return Value:
     DPF_ENTER(("[CMiniportWaveCyclic::PropertyHandler_Private]"));
 
     NTSTATUS        ntStatus = STATUS_INVALID_PARAMETER;
-    CMiniportTopology *that = (CMiniportTopology*) PropertyRequest->MajorTarget;
-
-    ASSERT (that);
+    //CMiniportTopology *that = (CMiniportTopology*) PropertyRequest->MajorTarget;
+    //ASSERT (that);
 
     if (PropertyRequest->Verb & KSPROPERTY_TYPE_GET) {
         // Check the ID ("function" in "group").
