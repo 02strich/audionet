@@ -9,4 +9,5 @@
 *.dll
 *.sys
 *komodoproject
+*.pyc
 
